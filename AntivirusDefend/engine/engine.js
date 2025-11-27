@@ -51,30 +51,37 @@
     width: 960,
     height: 540
   };
-  
-    // Keep a fixed logical world, but scale the visible canvas
+
+
+  // Logical world size is fixed; canvas pixels scale to fit viewport
   const BASE_WORLD_WIDTH = world.width;
   const BASE_WORLD_HEIGHT = world.height;
 
+  // How many canvas pixels correspond to one world unit (same for X/Y because we keep aspect)
+  let renderScale = 1;
+
   function resizeGameCanvas(){
-    if (!canvas) return;
+    if (!canvas || !ctx) return;
 
     const targetAspect = BASE_WORLD_WIDTH / BASE_WORLD_HEIGHT;
 
+    // Try to leave space for a header if present
     const header = document.querySelector('.page-header');
-    const headerHeight = header ? header.getBoundingClientRect().height : 0;
+    const headerRect = header ? header.getBoundingClientRect() : null;
+    const headerHeight = headerRect ? headerRect.height : 0;
 
-    // Available viewport area for the game
     const vw = window.innerWidth;
-    const vh = window.innerHeight - headerHeight - 24; // a bit of padding
+    const vh = window.innerHeight - headerHeight;
 
-    const availWidth  = Math.max(320, vw - 24);   // don’t go crazy small
-    const availHeight = Math.max(240, vh);
+    // Some padding so it doesn't touch edges
+    const padding = 24;
+    const availWidth  = Math.max(320, vw  - padding*2);
+    const availHeight = Math.max(240, vh  - padding*2);
 
     const availAspect = availWidth / availHeight;
 
     let displayWidth, displayHeight;
-    if (availAspect > targetAspect) {
+    if (availAspect > targetAspect){
       // Limited by height
       displayHeight = availHeight;
       displayWidth  = displayHeight * targetAspect;
@@ -84,10 +91,18 @@
       displayHeight = displayWidth / targetAspect;
     }
 
-    // We keep canvas.width/height = world size (960×540),
-    // and only scale the CSS box. All drawing still uses world coords.
+    const dpr = window.devicePixelRatio || 1;
+
+    // Size of the CSS box (world space size)
     canvas.style.width  = displayWidth + 'px';
     canvas.style.height = displayHeight + 'px';
+
+    // Actual backing resolution
+    canvas.width  = Math.round(displayWidth * dpr);
+    canvas.height = Math.round(displayHeight * dpr);
+
+    // How many canvas pixels per world unit
+    renderScale = canvas.width / BASE_WORLD_WIDTH;
   }
 
 
@@ -1549,7 +1564,7 @@ function drawHeroBody(){
     const barHeight = 12;
     const margin = 16;
     const startX = margin;
-    const startY = canvas.height-50;
+    const startY = world.height-50;
 
     ctx.save();
     ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -1588,8 +1603,17 @@ function drawHeroBody(){
     ctx.restore();
   }
 
-  function draw(){
+  
+function draw(){
+    if (!canvas || !ctx) return;
+
+    // Clear in raw canvas pixels
+    ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Scale world space (960x540) to current canvas resolution
+    ctx.setTransform(renderScale,0,0,renderScale,0,0);
+
     drawBackgroundCase();
     drawXPOrbs();
     drawParticles();
@@ -1600,6 +1624,7 @@ function drawHeroBody(){
     drawAOEPulses();
     drawHUD();
   }
+
 
   // --- Pause & menu wiring ---
 
@@ -1771,11 +1796,7 @@ function drawHeroBody(){
     dlog('Engine.showTitle()', 'info');
   };
   
-   // Init
-  canvas.width = world.width;
-  canvas.height = world.height;
-
-  // First responsive size
+  // Init
   resizeGameCanvas();
   window.addEventListener('resize', resizeGameCanvas);
 
@@ -1783,4 +1804,3 @@ function drawHeroBody(){
   dlog('Engine init complete, gameState=' + gameState, 'info');
   requestAnimationFrame(loop);
 })();
-
