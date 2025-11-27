@@ -247,10 +247,7 @@
     }
   });
 
-  // HERO DATA, NOW STORED INSIDE SEPERATE JAVASCRIPT FILE
-  AVDEF.Heroes.get(id)
-  AVDEF.Heroes.getAll()
-  
+  // HERO DATA moved to heroes/heroes.js
 
   const STAGES = [
     {
@@ -319,7 +316,7 @@
   // In-canvas logo images (for heads & virus mimic)
   const heroImages = {};
   function preloadHeroLogos(){
-    Object.values(HEROES).forEach(hero=>{
+    AVDEF.Heroes.getAll().forEach(hero=>{
       if(!hero.logoUrl) return;
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -337,7 +334,7 @@
   // Build hero select grid
   function buildHeroGrid(){
     heroGrid.innerHTML = '';
-    Object.values(HEROES).forEach(hero=>{
+    AVDEF.Heroes.getAll().forEach(hero=>{
       const card = document.createElement('div');
       card.className = 'hero-card';
       card.dataset.heroId = hero.id;
@@ -473,7 +470,7 @@
   }
 
   function applyHeroStats(id){
-    const hero = HEROES[id] || HEROES.defender;
+    const hero = AVDEF.Heroes.get(id);
     player.speed = hero.speed;
     player.baseDamage = hero.baseDamage;
     player.baseFireDelay = hero.fireDelay;
@@ -549,18 +546,48 @@
     }
   }
 
-  // Enemy factory, now stored in separate javascript file
- function spawnEnemy(type) {
-  const pos = pickSpawnEdge(); // your existing function
-  const enemy = AVDEF.Enemies.create(type, {
-    wave: currentWave,
-    x: pos.x,
-    y: pos.y,
-    idGen: () => nextEnemyId++
-  });
+  // Enemy factory
+  function spawnEnemy(type){
+    // Choose a spawn edge around the world bounds
+    const margin = 40;
+    const edge = Math.floor(Math.random()*4);
+    let x,y;
+    if(edge===0){
+      x = Math.random()*world.width;
+      y = -margin;
+    }else if(edge===1){
+      x = Math.random()*world.width;
+      y = world.height+margin;
+    }else if(edge===2){
+      x = -margin;
+      y = Math.random()*world.height;
+    }else{
+      x = world.width+margin;
+      y = Math.random()*world.height;
+    }
 
-  enemies.push(enemy);
-}
+    // Get type-specific stats from the Enemies module
+    const stats = AVDEF.Enemies.getStats(type, currentWave);
+
+    const e = {
+      id: nextEnemyId++,
+      type,
+      x,y,
+      vx:0,vy:0,
+      radius: 14,
+      speed: stats.speed,
+      hp: stats.hp,
+      maxHp: stats.hp,
+      disguised: !!stats.disguised,
+      stolenAbility: null,
+      lastAttack: 0,
+      slowUntil: 0,
+      confusedUntil: 0,
+      xpValue: stats.xpValue
+    };
+
+    enemies.push(e);
+  }
 
   function activateNortonShield(duration,stage){
     player.nortonShieldStage = stage;
@@ -739,6 +766,41 @@
     upgradeOverlay.classList.add('visible');
     gameState = 'upgrade';
   }
+
+  // Ransomware logic
+  function stealAbility(enemy){
+    const stealable = player.abilities.filter(a=>a!=='basicShot');
+    if(stealable.length===0) return;
+    const idx = Math.floor(Math.random()*stealable.length);
+    const ability = stealable[idx];
+    player.abilities = player.abilities.filter(a=>a!==ability);
+    enemy.stolenAbility = ability;
+    activeRansom = {
+      enemyId: enemy.id,
+      ability,
+      cost: 50
+    };
+    ransomText.textContent = `Ransomware stole your ${ability === 'orbit' ? 'Defender orbit' : ability}! Pay 50 chips? (65% chance of return)`;
+    ransomBar.style.display = 'flex';
+  }
+
+  btnPayRansom.addEventListener('click', ()=>{
+    if(!activeRansom) return;
+    if(chips.amount < activeRansom.cost) return;
+    chips.amount -= activeRansom.cost;
+    if(Math.random() < 0.65){
+      if(!player.abilities.includes(activeRansom.ability)){
+        player.abilities.push(activeRansom.ability);
+      }
+    }
+    activeRansom = null;
+    ransomBar.style.display = 'none';
+    updateTopUI();
+  });
+  btnIgnoreRansom.addEventListener('click', ()=>{
+    activeRansom = null;
+    ransomBar.style.display = 'none';
+  });
 
   // Projectiles
   function spawnProjectile(x,y,angle,speed,damage,fromEnemy=false,kind='bullet'){
@@ -1401,7 +1463,7 @@
   }
 
   function drawHeroBody(){
-    const hero = HEROES[currentHeroId] || HEROES.defender;
+    const hero = AVDEF.Heroes.get(currentHeroId);
     ctx.save();
     ctx.translate(player.x,player.y);
     const baseR = player.radius;
