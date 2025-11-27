@@ -1,3 +1,4 @@
+// engine.js
 (function(){
   // --- Canvas & UI elements ---
   const canvas = document.getElementById('gameCanvas');
@@ -150,37 +151,12 @@
   let ransomAmount = 0;
   let ransomPaid = false;
 
-  let usingGamepad = false;
-  let gamepadIndex = 0;
-
-  const keys = {
-    ArrowUp:false,
-    ArrowDown:false,
-    ArrowLeft:false,
-    ArrowRight:false,
-    KeyW:false,
-    KeyA:false,
-    KeyS:false,
-    KeyD:false,
-    Space:false,
-    KeyP:false,
-    Escape:false
-  };
-
-  let mouseX = world.width/2;
-  let mouseY = world.height/2;
-  let mouseDown = false;
-
-  let joystickActive = false;
-  let joystickTouchId = null;
-  let joystickCenter = { x:0, y:0 };
-  let joystickVec = { x:0, y:0 };
-
   let masterVolume = 0.5;
   let enableParticles = true;
 
   let audioCtx = null;
   let masterGain = null;
+  let audioArmed = false;
 
   let scanConeAngle = 0;
   let scanConeSpeed = 1.4;
@@ -650,50 +626,49 @@
     upgradeOverlay.classList.add('visible');
   }
 
+  // --- Input bridge to input.js ---
+
+  function getInputState(){
+    if(window.AVDEF && AVDEF.Input && typeof AVDEF.Input.getState === 'function'){
+      try{
+        return AVDEF.Input.getState();
+      }catch(e){
+        dlog('AVDEF.Input.getState threw: ' + e.message, 'warn');
+      }
+    }
+    // Fallback: no input module yet
+    return {
+      moveX: 0,
+      moveY: 0,
+      pointerX: null,
+      pointerY: null,
+      firing: false,
+      pausePressed: false,
+      abilityPressed: false,
+      aimStickX: 0,
+      aimStickY: 0
+    };
+  }
+
+  let lastPausePressed = false;
+  let lastAbilityPressed = false;
+
   // --- Input handling & update loop ---
 
   function handleInput(dt){
-    let mx = 0;
-    let my = 0;
+    const input = getInputState();
 
-    if(joystickActive){
-      mx = joystickVec.x;
-      my = joystickVec.y;
-    }else{
-      if(keys.KeyW || keys.ArrowUp) my -= 1;
-      if(keys.KeyS || keys.ArrowDown) my += 1;
-      if(keys.KeyA || keys.ArrowLeft) mx -= 1;
-      if(keys.KeyD || keys.ArrowRight) mx += 1;
-    }
-
-    let gmx = 0, gmy = 0;
-    const gp = navigator.getGamepads ? navigator.getGamepads()[gamepadIndex] : null;
-    if(gp){
-      const ax = gp.axes[0] || 0;
-      const ay = gp.axes[1] || 0;
-      const dead = 0.2;
-      if(Math.abs(ax) > dead || Math.abs(ay) > dead){
-        usingGamepad = true;
-        gmx = ax;
-        gmy = ay;
-      }
-      if(gp.buttons[9] && gp.buttons[9].pressed){
-        if(!keys._gpPause){
-          togglePause();
-          keys._gpPause = true;
-        }
-      }else{
-        keys._gpPause = false;
-      }
-    }
-
-    mx += gmx;
-    my += gmy;
+    // Movement (keyboard / touch joystick / gamepad left stick)
+    let mx = input.moveX || 0;
+    let my = input.moveY || 0;
 
     const len = Math.hypot(mx,my);
-    if(len>0){
+    if(len > 1){
       mx /= len;
       my /= len;
+    }
+
+    if(len > 0){
       const effSpeed = player.speed * (gameTime < player.stunnedUntil ? 0.4 : 1);
       player.x += mx*effSpeed*dt;
       player.y += my*effSpeed*dt;
@@ -703,11 +678,18 @@
       if(player.y > world.height-player.radius) player.y = world.height-player.radius;
     }
 
-    let tx = mouseX;
-    let ty = mouseY;
-    if(usingGamepad && gp){
-      const ax2 = gp.axes[2] || 0;
-      const ay2 = gp.axes[3] || 0;
+    // Aiming (mouse / touch pointer / gamepad right stick)
+    let tx = player.x + Math.cos(player.facingAngle)*10;
+    let ty = player.y + Math.sin(player.facingAngle)*10;
+
+    if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number'){
+      tx = input.pointerX;
+      ty = input.pointerY;
+    }
+
+    if(typeof input.aimStickX === 'number' && typeof input.aimStickY === 'number'){
+      const ax2 = input.aimStickX;
+      const ay2 = input.aimStickY;
       const dead2 = 0.25;
       if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
         tx = player.x + ax2*200;
@@ -724,10 +706,13 @@
     const now = gameTime;
     const baseDelay = player.baseFireDelay*player.fireDelayMult;
     const canShoot = (now - player.lastShot) >= baseDelay;
-    const gp2 = navigator.getGamepads ? navigator.getGamepads()[gamepadIndex] : null;
-    const firing = mouseDown || (gp2 && gp2.buttons[7] && gp2.buttons[7].pressed);
+    const firing = !!input.firing;
 
     if(canShoot && firing){
+      if(!audioArmed){
+        ensureAudio();
+        audioArmed = true;
+      }
       const baseDamage = player.baseDamage*player.damageMult;
       const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
       const dmg = baseDamage*stunMult;
@@ -737,14 +722,23 @@
       playBeep(620,0.05,0.12);
     }
 
-    if(keys.Space){
-      if(!keys._spacePressed){
-        keys._spacePressed = true;
-        tryUseHeroAbility();
+    // Ability button (space / gamepad A etc)
+    if(input.abilityPressed && !lastAbilityPressed){
+      if(!audioArmed){
+        ensureAudio();
+        audioArmed = true;
       }
-    }else{
-      keys._spacePressed = false;
+      tryUseHeroAbility();
     }
+    lastAbilityPressed = !!input.abilityPressed;
+
+    // Pause button (P / Esc / gamepad Start)
+    if(input.pausePressed && !lastPausePressed){
+      if(gameState === 'playing' || gameState === 'paused'){
+        togglePause();
+      }
+    }
+    lastPausePressed = !!input.pausePressed;
   }
 
   function tryUseHeroAbility(){
@@ -1062,359 +1056,359 @@
   }
 
   // --- Drawing ---
-function drawBackgroundCase(){
-  const grad = ctx.createLinearGradient(0,0,0,canvas.height);
-  grad.addColorStop(0,'#020617');
-  grad.addColorStop(1,'#0b1120');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  function drawBackgroundCase(){
+    const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+    grad.addColorStop(0,'#020617');
+    grad.addColorStop(1,'#0b1120');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.save();
-  ctx.strokeStyle = 'rgba(148,163,184,0.18)';
-  ctx.lineWidth = 2;
-  const pad = 40;
-  ctx.beginPath();
-  ctx.moveTo(pad,pad);
-  ctx.lineTo(canvas.width-pad,pad);
-  ctx.lineTo(canvas.width-pad,canvas.height-pad);
-  ctx.lineTo(pad,canvas.height-pad);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.save();
-  ctx.strokeStyle = 'rgba(56,189,248,0.18)';
-  ctx.lineWidth = 1;
-  const cols = 6;
-  const rows = 3;
-  const pad2 = 40;
-  for(let i=1;i<cols;i++){
-    const x = pad2 + (canvas.width-2*pad2)*(i/cols);
-    ctx.beginPath();
-    ctx.moveTo(x,pad2);
-    ctx.lineTo(x,canvas.height-pad2);
-    ctx.stroke();
-  }
-  for(let j=1;j<rows;j++){
-    const y = pad2 + (canvas.height-2*pad2)*(j/rows);
-    ctx.beginPath();
-    ctx.moveTo(pad2,y);
-    ctx.lineTo(canvas.width-pad2,y);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(15,23,42,0.9)';
-  ctx.fillRect(0,canvas.height-60,canvas.width,60);
-  ctx.restore();
-}
-
-function drawXPOrbs(){
-  ctx.save();
-  ctx.fillStyle = '#22c55e';
-  for(const orb of xpOrbs){
-    ctx.beginPath();
-    ctx.arc(orb.x,orb.y,orb.radius,0,Math.PI*2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawParticles(){
-  ctx.save();
-  for(const p of particles){
-    const t = p.life/p.maxLife;
-    if(t<=0) continue;
-    ctx.globalAlpha = t;
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.arc(p.x,p.y,4,0,Math.PI*2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawEnemies(){
-  ctx.save();
-  for(const e of enemies){
     ctx.save();
-    ctx.translate(e.x,e.y);
-    const slowActive = gameTime < e.slowUntil;
-    const confusedActive = gameTime < e.confusedUntil;
-    const radius = e.radius;
+    ctx.strokeStyle = 'rgba(148,163,184,0.18)';
+    ctx.lineWidth = 2;
+    const pad = 40;
+    ctx.beginPath();
+    ctx.moveTo(pad,pad);
+    ctx.lineTo(canvas.width-pad,pad);
+    ctx.lineTo(canvas.width-pad,canvas.height-pad);
+    ctx.lineTo(pad,canvas.height-pad);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
 
+    ctx.save();
+    ctx.strokeStyle = 'rgba(56,189,248,0.18)';
+    ctx.lineWidth = 1;
+    const cols = 6;
+    const rows = 3;
+    const pad2 = 40;
+    for(let i=1;i<cols;i++){
+      const x = pad2 + (canvas.width-2*pad2)*(i/cols);
+      ctx.beginPath();
+      ctx.moveTo(x,pad2);
+      ctx.lineTo(x,canvas.height-pad2);
+      ctx.stroke();
+    }
+    for(let j=1;j<rows;j++){
+      const y = pad2 + (canvas.height-2*pad2)*(j/rows);
+      ctx.beginPath();
+      ctx.moveTo(pad2,y);
+      ctx.lineTo(canvas.width-pad2,y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(15,23,42,0.9)';
+    ctx.fillRect(0,canvas.height-60,canvas.width,60);
+    ctx.restore();
+  }
+
+  function drawXPOrbs(){
+    ctx.save();
+    ctx.fillStyle = '#22c55e';
+    for(const orb of xpOrbs){
+      ctx.beginPath();
+      ctx.arc(orb.x,orb.y,orb.radius,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawParticles(){
+    ctx.save();
+    for(const p of particles){
+      const t = p.life/p.maxLife;
+      if(t<=0) continue;
+      ctx.globalAlpha = t;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,4,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawEnemies(){
+    ctx.save();
+    for(const e of enemies){
+      ctx.save();
+      ctx.translate(e.x,e.y);
+      const slowActive = gameTime < e.slowUntil;
+      const confusedActive = gameTime < e.confusedUntil;
+      const radius = e.radius;
+
+      ctx.beginPath();
+      ctx.fillStyle = '#0f172a';
+      ctx.arc(0,0,radius+6,0,Math.PI*2);
+      ctx.fill();
+
+      const hpFrac = e.hp/e.maxHp;
+      ctx.beginPath();
+      ctx.strokeStyle = '#f97373';
+      ctx.lineWidth = 3;
+      ctx.arc(0,0,radius+4, -Math.PI/2, -Math.PI/2 + hpFrac*Math.PI*2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = slowActive ? '#22c55e' : (confusedActive ? '#fbbf24' : '#e5e7eb');
+      ctx.arc(0,0,radius,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = '#020617';
+      ctx.beginPath();
+      ctx.arc(-radius/3,-radius/3,3,0,Math.PI*2);
+      ctx.arc(radius/3,-radius/3,3,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.fillStyle = e.disguised ? '#fb7185' : '#22d3ee';
+      ctx.arc(0,radius/3,4,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function drawHeroBody(){
+    const hero = AVDEF.Heroes.get(currentHeroId) || {};
+    ctx.save();
+    ctx.translate(player.x,player.y);
+    ctx.rotate(player.facingAngle);
+
+    ctx.save();
     ctx.beginPath();
     ctx.fillStyle = '#0f172a';
-    ctx.arc(0,0,radius+6,0,Math.PI*2);
+    ctx.arc(0,0,player.radius+6,0,Math.PI*2);
     ctx.fill();
 
-    const hpFrac = e.hp/e.maxHp;
+    const hpFrac = player.hp/player.maxHp;
     ctx.beginPath();
-    ctx.strokeStyle = '#f97373';
-    ctx.lineWidth = 3;
-    ctx.arc(0,0,radius+4, -Math.PI/2, -Math.PI/2 + hpFrac*Math.PI*2);
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 4;
+    ctx.arc(0,0,player.radius+4,-Math.PI/2,-Math.PI/2+hpFrac*Math.PI*2);
     ctx.stroke();
-
-    ctx.beginPath();
-    ctx.fillStyle = slowActive ? '#22c55e' : (confusedActive ? '#fbbf24' : '#e5e7eb');
-    ctx.arc(0,0,radius,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.fillStyle = '#020617';
-    ctx.beginPath();
-    ctx.arc(-radius/3,-radius/3,3,0,Math.PI*2);
-    ctx.arc(radius/3,-radius/3,3,0,Math.PI*2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.fillStyle = e.disguised ? '#fb7185' : '#22d3ee';
-    ctx.arc(0,radius/3,4,0,Math.PI*2);
-    ctx.fill();
-
     ctx.restore();
-  }
-  ctx.restore();
-}
 
-function drawHeroBody(){
-  const hero = AVDEF.Heroes.get(currentHeroId) || {};
-  ctx.save();
-  ctx.translate(player.x,player.y);
-  ctx.rotate(player.facingAngle);
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.fillStyle = '#0f172a';
-  ctx.arc(0,0,player.radius+6,0,Math.PI*2);
-  ctx.fill();
-
-  const hpFrac = player.hp/player.maxHp;
-  ctx.beginPath();
-  ctx.strokeStyle = '#22c55e';
-  ctx.lineWidth = 4;
-  ctx.arc(0,0,player.radius+4,-Math.PI/2,-Math.PI/2+hpFrac*Math.PI*2);
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.save();
-  const grad = ctx.createLinearGradient(-player.radius,0,player.radius,0);
-  grad.addColorStop(0,'#38bdf8');
-  grad.addColorStop(1,'#22c55e');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.ellipse(0,0,player.radius*1.2,player.radius,0,0,Math.PI*2);
-  ctx.fill();
-  ctx.restore();
-
-  if(heroImages[currentHeroId]){
     ctx.save();
-    ctx.rotate(-player.facingAngle);
-    const img = heroImages[currentHeroId];
-    const size = player.radius*1.2;
-    ctx.globalAlpha = 0.95;
-    ctx.drawImage(img,-size*0.7,-size*0.7,size*1.4,size*1.4);
-    ctx.restore();
-  }else{
-    ctx.save();
-    ctx.rotate(-player.facingAngle);
-    ctx.fillStyle = '#0b1120';
-    ctx.beginPath();
-    ctx.arc(0,0,player.radius*0.65,0,Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = '#e5e7eb';
-    ctx.font = `bold ${player.radius*0.9}px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(hero.initial || '?',0,1);
-    ctx.restore();
-  }
-
-  ctx.save();
-  ctx.strokeStyle = 'rgba(56,189,248,0.55)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(player.radius*0.7,0);
-  ctx.lineTo(player.radius*1.8,0);
-  ctx.stroke();
-  ctx.restore();
-
-  if(gameTime < player.nortonShieldActiveUntil){
-    const t = (player.nortonShieldActiveUntil - gameTime)/3;
-    const blink = 0.6 + 0.4*Math.sin(gameTime*10);
-    ctx.save();
-    ctx.globalAlpha = Math.max(0,Math.min(1,t))*blink;
-    const grad2 = ctx.createRadialGradient(0,0,player.radius*0.6,0,0,player.radius*1.7);
-    grad2.addColorStop(0,'rgba(251,191,36,0.1)');
-    grad2.addColorStop(1,'rgba(251,191,36,0.5)');
-    ctx.fillStyle = grad2;
-    ctx.beginPath();
-    ctx.arc(0,0,player.radius*1.7,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  if(scanConeEnabled){
-    ctx.save();
-    ctx.globalAlpha = 0.18;
-    const width = Math.PI/6;
-    const start = -width/2;
-    const end = width/2;
-    const r = player.radius*5;
-    const grad = ctx.createRadialGradient(0,0,player.radius*0.4,0,0,r);
-    grad.addColorStop(0,'rgba(56,189,248,0.0)');
-    grad.addColorStop(0.5,'rgba(56,189,248,0.37)');
-    grad.addColorStop(1,'rgba(56,189,248,0.0)');
+    const grad = ctx.createLinearGradient(-player.radius,0,player.radius,0);
+    grad.addColorStop(0,'#38bdf8');
+    grad.addColorStop(1,'#22c55e');
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.moveTo(0,0);
-    ctx.arc(0,0,r,start,end);
-    ctx.closePath();
+    ctx.ellipse(0,0,player.radius*1.2,player.radius,0,0,Math.PI*2);
     ctx.fill();
+    ctx.restore();
+
+    if(heroImages[currentHeroId]){
+      ctx.save();
+      ctx.rotate(-player.facingAngle);
+      const img = heroImages[currentHeroId];
+      const size = player.radius*1.2;
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(img,-size*0.7,-size*0.7,size*1.4,size*1.4);
+      ctx.restore();
+    }else{
+      ctx.save();
+      ctx.rotate(-player.facingAngle);
+      ctx.fillStyle = '#0b1120';
+      ctx.beginPath();
+      ctx.arc(0,0,player.radius*0.65,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = `bold ${player.radius*0.9}px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(hero.initial || '?',0,1);
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(56,189,248,0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(player.radius*0.7,0);
+    ctx.lineTo(player.radius*1.8,0);
+    ctx.stroke();
+    ctx.restore();
+
+    if(gameTime < player.nortonShieldActiveUntil){
+      const t = (player.nortonShieldActiveUntil - gameTime)/3;
+      const blink = 0.6 + 0.4*Math.sin(gameTime*10);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0,Math.min(1,t))*blink;
+      const grad2 = ctx.createRadialGradient(0,0,player.radius*0.6,0,0,player.radius*1.7);
+      grad2.addColorStop(0,'rgba(251,191,36,0.1)');
+      grad2.addColorStop(1,'rgba(251,191,36,0.5)');
+      ctx.fillStyle = grad2;
+      ctx.beginPath();
+      ctx.arc(0,0,player.radius*1.7,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if(scanConeEnabled){
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      const width = Math.PI/6;
+      const start = -width/2;
+      const end = width/2;
+      const r = player.radius*5;
+      const grad = ctx.createRadialGradient(0,0,player.radius*0.4,0,0,r);
+      grad.addColorStop(0,'rgba(56,189,248,0.0)');
+      grad.addColorStop(0.5,'rgba(56,189,248,0.37)');
+      grad.addColorStop(1,'rgba(56,189,248,0.0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0,0,r,start,end);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if(player.orbitLevel>0 && player.orbitProjectiles.length>0){
+      ctx.save();
+      ctx.rotate(-player.facingAngle);
+      for(const orb of player.orbitProjectiles){
+        const ox = Math.cos(orb.angle)*orb.radius;
+        const oy = Math.sin(orb.angle)*orb.radius;
+        ctx.beginPath();
+        ctx.fillStyle = '#38bdf8';
+        ctx.arc(ox,oy,6,0,Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(56,189,248,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.arc(ox,oy,10,0,Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if(gameTime < player.phaseShiftingUntil){
+      const t = (player.phaseShiftingUntil - gameTime)/player.phaseShiftDuration;
+      ctx.save();
+      ctx.globalAlpha = 0.3+0.4*t;
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.arc(0,0,player.radius*1.5,0,Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
-  if(player.orbitLevel>0 && player.orbitProjectiles.length>0){
+  function drawHero(){
+    drawHeroBody();
+  }
+
+  function drawProjectiles(){
     ctx.save();
-    ctx.rotate(-player.facingAngle);
-    for(const orb of player.orbitProjectiles){
-      const ox = Math.cos(orb.angle)*orb.radius;
-      const oy = Math.sin(orb.angle)*orb.radius;
+    for(const p of projectiles){
       ctx.beginPath();
-      ctx.fillStyle = '#38bdf8';
-      ctx.arc(ox,oy,6,0,Math.PI*2);
+      if(p.kind === 'shield' || p.kind === 'shield-toss'){
+        const grad = ctx.createLinearGradient(p.x-10,p.y-10,p.x+10,p.y+10);
+        grad.addColorStop(0,'#60a5fa');
+        grad.addColorStop(1,'#22d3ee');
+        ctx.fillStyle = grad;
+        ctx.arc(p.x,p.y,p.radius+2,0,Math.PI*2);
+      }else{
+        ctx.fillStyle = '#38bdf8';
+        ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+      }
       ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawBeams(){
+    ctx.save();
+    for(const b of beams){
+      const t = b.life/b.maxLife;
+      ctx.globalAlpha = t;
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 6;
       ctx.beginPath();
-      ctx.strokeStyle = 'rgba(56,189,248,0.45)';
-      ctx.lineWidth = 1.5;
-      ctx.arc(ox,oy,10,0,Math.PI*2);
+      ctx.moveTo(b.x1,b.y1);
+      ctx.lineTo(b.x2,b.y2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(b.x1,b.y1);
+      ctx.lineTo(b.x2,b.y2);
       ctx.stroke();
     }
     ctx.restore();
   }
 
-  if(gameTime < player.phaseShiftingUntil){
-    const t = (player.phaseShiftingUntil - gameTime)/player.phaseShiftDuration;
+  function drawAOEPulses(){
     ctx.save();
-    ctx.globalAlpha = 0.3+0.4*t;
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4,4]);
-    ctx.beginPath();
-    ctx.arc(0,0,player.radius*1.5,0,Math.PI*2);
-    ctx.stroke();
+    for(const a of aoePulses){
+      const t = a.life/a.maxLife;
+      ctx.globalAlpha = t*0.7;
+      const grad = ctx.createRadialGradient(a.x,a.y,a.radius*0.2,a.x,a.y,a.radius);
+      grad.addColorStop(0,'rgba(249,115,22,0.0)');
+      grad.addColorStop(0.4,'rgba(249,115,22,0.5)');
+      grad.addColorStop(1,'rgba(248,250,252,0.0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(a.x,a.y,a.radius,0,Math.PI*2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
-  ctx.restore();
-}
+  function drawHUD(){
+    const barWidth = 220;
+    const barHeight = 12;
+    const margin = 16;
+    const startX = margin;
+    const startY = canvas.height-50;
 
-function drawHero(){
-  drawHeroBody();
-}
+    ctx.save();
+    ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#e5e7eb';
+    ctx.textBaseline = 'top';
 
-function drawProjectiles(){
-  ctx.save();
-  for(const p of projectiles){
-    ctx.beginPath();
-    if(p.kind === 'shield' || p.kind === 'shield-toss'){
-      const grad = ctx.createLinearGradient(p.x-10,p.y-10,p.x+10,p.y+10);
-      grad.addColorStop(0,'#60a5fa');
-      grad.addColorStop(1,'#22d3ee');
-      ctx.fillStyle = grad;
-      ctx.arc(p.x,p.y,p.radius+2,0,Math.PI*2);
-    }else{
-      ctx.fillStyle = '#38bdf8';
-      ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
-    }
-    ctx.fill();
+    ctx.fillText(`Wave ${currentWave}`, startX, startY-18);
+    ctx.fillText(`LVL ${player.level}`, startX+barWidth+40, startY-18);
+    ctx.fillText(`Chips ${chips.count}`, startX+barWidth+40, startY+barHeight+4);
+
+    ctx.fillStyle = 'rgba(15,23,42,0.9)';
+    ctx.fillRect(startX-6,startY-6,barWidth+12,barHeight+12);
+    ctx.fillRect(startX-6,startY+barHeight+8,barWidth+12,barHeight+12);
+
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(startX-4,startY-4,barWidth+8,barHeight+8);
+    ctx.fillRect(startX-4,startY+barHeight+10,barWidth+8,barHeight+8);
+
+    const hpFrac = player.hp/player.maxHp;
+    ctx.fillStyle = '#f97373';
+    ctx.fillRect(startX-2,startY-2,(barWidth+4)*hpFrac,barHeight+4);
+    ctx.fillStyle = 'rgba(15,23,42,0.8)';
+    ctx.fillRect(startX-2,startY-2,barWidth+4,barHeight+4);
+
+    const xpFrac = player.xp/player.xpToNext;
+    ctx.fillStyle = '#22c55e';
+    ctx.fillRect(startX-2,startY+barHeight+12,(barWidth+4)*xpFrac,barHeight+4);
+    ctx.fillStyle = 'rgba(15,23,42,0.8)';
+    ctx.fillRect(startX-2,startY+barHeight+12,barWidth+4,barHeight+4);
+
+    ctx.fillStyle = '#f97373';
+    ctx.fillText(`${player.hp}/${player.maxHp}`, startX+6, startY-2);
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText(`${player.xp}/${player.xpToNext}`, startX+6, startY+barHeight+10);
+
+    ctx.restore();
   }
-  ctx.restore();
-}
 
-function drawBeams(){
-  ctx.save();
-  for(const b of beams){
-    const t = b.life/b.maxLife;
-    ctx.globalAlpha = t;
-    ctx.strokeStyle = '#fde047';
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(b.x1,b.y1);
-    ctx.lineTo(b.x2,b.y2);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#facc15';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(b.x1,b.y1);
-    ctx.lineTo(b.x2,b.y2);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawAOEPulses(){
-  ctx.save();
-  for(const a of aoePulses){
-    const t = a.life/a.maxLife;
-    ctx.globalAlpha = t*0.7;
-    const grad = ctx.createRadialGradient(a.x,a.y,a.radius*0.2,a.x,a.y,a.radius);
-    grad.addColorStop(0,'rgba(249,115,22,0.0)');
-    grad.addColorStop(0.4,'rgba(249,115,22,0.5)');
-    grad.addColorStop(1,'rgba(248,250,252,0.0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(a.x,a.y,a.radius,0,Math.PI*2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawHUD(){
-  const barWidth = 220;
-  const barHeight = 12;
-  const margin = 16;
-  const startX = margin;
-  const startY = canvas.height-50;
-
-  ctx.save();
-  ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  ctx.fillStyle = '#e5e7eb';
-  ctx.textBaseline = 'top';
-
-  ctx.fillText(`Wave ${currentWave}`, startX, startY-18);
-  ctx.fillText(`LVL ${player.level}`, startX+barWidth+40, startY-18);
-  ctx.fillText(`Chips ${chips.count}`, startX+barWidth+40, startY+barHeight+4);
-
-  ctx.fillStyle = 'rgba(15,23,42,0.9)';
-  ctx.fillRect(startX-6,startY-6,barWidth+12,barHeight+12);
-  ctx.fillRect(startX-6,startY+barHeight+8,barWidth+12,barHeight+12);
-
-  ctx.fillStyle = '#020617';
-  ctx.fillRect(startX-4,startY-4,barWidth+8,barHeight+8);
-  ctx.fillRect(startX-4,startY+barHeight+10,barWidth+8,barHeight+8);
-
-  const hpFrac = player.hp/player.maxHp;
-  ctx.fillStyle = '#f97373';
-  ctx.fillRect(startX-2,startY-2,(barWidth+4)*hpFrac,barHeight+4);
-  ctx.fillStyle = 'rgba(15,23,42,0.8)';
-  ctx.fillRect(startX-2,startY-2,barWidth+4,barHeight+4);
-
-  const xpFrac = player.xp/player.xpToNext;
-  ctx.fillStyle = '#22c55e';
-  ctx.fillRect(startX-2,startY+barHeight+12,(barWidth+4)*xpFrac,barHeight+4);
-  ctx.fillStyle = 'rgba(15,23,42,0.8)';
-  ctx.fillRect(startX-2,startY+barHeight+12,barWidth+4,barHeight+4);
-
-  ctx.fillStyle = '#f97373';
-  ctx.fillText(`${player.hp}/${player.maxHp}`, startX+6, startY-2);
-  ctx.fillStyle = '#22c55e';
-  ctx.fillText(`${player.xp}/${player.xpToNext}`, startX+6, startY+barHeight+10);
-
-  ctx.restore();
-      }
-  
   function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     drawBackgroundCase();
@@ -1428,16 +1422,7 @@ function drawHUD(){
     drawHUD();
   }
 
-  // (Drawing helpers are same as previous version)  
-  // -- I’m not repeating them here to save scroll space in your chat UI --
-  // You can keep the drawing functions from the last engine.js I gave you
-  // (drawBackgroundCase, drawXPOrbs, drawParticles, drawEnemies, drawHeroBody,
-  //  drawHero, drawProjectiles, drawBeams, drawAOEPulses, drawHUD)
-  // unchanged below this comment.
-
-  /* paste all the same drawing functions from the previous engine.js here */
-
-  // --- Pause & input wiring ---
+  // --- Pause & menu wiring ---
 
   function togglePause(){
     if(gameState === 'playing'){
@@ -1446,104 +1431,6 @@ function drawHUD(){
     }else if(gameState === 'paused'){
       gameState = 'playing';
       if(pauseOverlay) pauseOverlay.classList.remove('visible');
-    }
-  }
-
-  function onKeyDown(e){
-    if(e.repeat) return;
-    if(e.code in keys){
-      keys[e.code] = true;
-    }
-    if(e.code === 'KeyP' || e.code === 'Escape'){
-      if(gameState === 'playing' || gameState === 'paused'){
-        togglePause();
-      }
-    }
-  }
-
-  function onKeyUp(e){
-    if(e.code in keys){
-      keys[e.code] = false;
-    }
-  }
-
-  function onMouseMove(e){
-    const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
-  }
-
-  function onMouseDown(e){
-    if(e.button === 0){
-      mouseDown = true;
-    }
-  }
-
-  function onMouseUp(e){
-    if(e.button === 0){
-      mouseDown = false;
-    }
-  }
-
-  function screenToCanvas(x,y){
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: (x - rect.left) * (canvas.width/rect.width),
-      y: (y - rect.top) * (canvas.height/rect.height)
-    };
-  }
-
-  function onTouchStart(e){
-    for(const touch of e.changedTouches){
-      const pos = screenToCanvas(touch.clientX,touch.clientY);
-      if(pos.x < canvas.width*0.4){
-        if(!joystickActive && touchJoystickBase && touchJoystickStick){
-          joystickActive = true;
-          joystickTouchId = touch.identifier;
-          joystickCenter = { x:pos.x, y:pos.y };
-          joystickVec = { x:0, y:0 };
-          touchJoystickBase.style.left = `${pos.x-40}px`;
-          touchJoystickBase.style.top = `${pos.y-40}px`;
-          touchJoystickBase.classList.add('visible');
-        }
-      }else{
-        mouseDown = true;
-      }
-    }
-  }
-
-  function onTouchMove(e){
-    for(const touch of e.changedTouches){
-      const pos = screenToCanvas(touch.clientX,touch.clientY);
-      if(joystickActive && touch.identifier === joystickTouchId && touchJoystickBase && touchJoystickStick){
-        const dx = pos.x - joystickCenter.x;
-        const dy = pos.y - joystickCenter.y;
-        const dist = Math.hypot(dx,dy);
-        const maxDist = 36;
-        let vx = dx, vy = dy;
-        if(dist > maxDist){
-          const k = maxDist/(dist||1);
-          vx *= k;
-          vy *= k;
-        }
-        touchJoystickStick.style.left = `${joystickCenter.x + vx - 20}px`;
-        touchJoystickStick.style.top = `${joystickCenter.y + vy - 20}px`;
-        joystickVec = { x:(dx/(dist||1)), y:(dy/(dist||1)) };
-      }
-    }
-  }
-
-  function onTouchEnd(e){
-    for(const touch of e.changedTouches){
-      const pos = screenToCanvas(touch.clientX,touch.clientY);
-      if(joystickActive && touch.identifier === joystickTouchId && touchJoystickBase){
-        joystickActive = false;
-        joystickTouchId = null;
-        joystickVec = { x:0, y:0 };
-        touchJoystickBase.classList.remove('visible');
-      }else{
-        mouseDown = false;
-      }
     }
   }
 
@@ -1779,18 +1666,6 @@ function drawHUD(){
       applyRansomOutcome();
     });
   }
-
-  // Global listeners
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
-  canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mousedown', onMouseDown);
-  window.addEventListener('mouseup', onMouseUp);
-
-  canvas.addEventListener('touchstart', onTouchStart, { passive:false });
-  canvas.addEventListener('touchmove', onTouchMove, { passive:false });
-  canvas.addEventListener('touchend', onTouchEnd, { passive:false });
-  canvas.addEventListener('touchcancel', onTouchEnd, { passive:false });
 
   function loop(){
     const now = performance.now();
