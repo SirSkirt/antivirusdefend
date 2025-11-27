@@ -428,41 +428,43 @@
     updateTopUI();
   }
 
-  // BASE_UPGRADES & heroSpecificUpgrades moved to upgrades/upgrades.js
-
   function showUpgradeChoices(source){
-    source = source || 'wave'; // 'wave' or 'xp'
-    upgradeGrid.innerHTML = '';
-    const pool = AVDEF.Upgrades.getPool(currentHeroId, player);
-    const picks = [];
-    const poolCopy = pool.slice();
-    const count = Math.min(3,poolCopy.length);
-    for(let i=0;i<count;i++){
-      const idx = Math.floor(Math.random()*poolCopy.length);
-      picks.push(poolCopy.splice(idx,1)[0]);
-    }
-    picks.forEach(up=>{
-      const card = document.createElement('div');
-      card.className = 'upgrade-card';
-      const h3 = document.createElement('h3');
-      h3.textContent = up.name;
-      const p = document.createElement('p');
-      p.textContent = up.desc;
-      card.appendChild(h3);
-      card.appendChild(p);
-      card.onclick = ()=>{
-        up.apply();
-        upgradeOverlay.classList.remove('visible');
-        if(source === 'wave'){
-          planWave();
-        }
-        gameState = 'playing';
-      };
-      upgradeGrid.appendChild(card);
-    });
-    upgradeOverlay.classList.add('visible');
+  source = source || 'wave'; // 'wave' or 'xp'
+  upgradeGrid.innerHTML = '';
+
+  const pool = AVDEF.Upgrades.getPool(currentHeroId, player);
+  const picks = [];
+  const poolCopy = pool.slice();
+  const count = Math.min(3,poolCopy.length);
+
+  for(let i=0;i<count;i++){
+    const idx = Math.floor(Math.random()*poolCopy.length);
+    picks.push(poolCopy.splice(idx,1)[0]);
   }
 
+  picks.forEach(up=>{
+    const card = document.createElement('div');
+    card.className = 'upgrade-card';
+    const h3 = document.createElement('h3');
+    h3.textContent = up.name;
+    const p = document.createElement('p');
+    p.textContent = up.desc;
+    card.appendChild(h3);
+    card.appendChild(p);
+    card.onclick = ()=>{
+      up.apply();             // no args, uses captured player
+      gameState = 'playing';
+      upgradeOverlay.classList.remove('visible');
+      if(source === 'wave'){
+        planWave();
+      }
+    };
+    upgradeGrid.appendChild(card);
+  });
+
+  upgradeOverlay.classList.add('visible');
+}
+  
   function endRun(victory){
     if(gameState === 'gameover') return;
     gameState = 'gameover';
