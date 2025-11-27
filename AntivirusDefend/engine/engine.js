@@ -1680,9 +1680,8 @@
     draw();
 
     requestAnimationFrame(loop);
-    
-    // --- Public engine API for title.js / menus ---
-
+  }
+// --- Public engine API for title.js / menus ---
   window.AVDEF = window.AVDEF || {};
   AVDEF.Engine = AVDEF.Engine || {};
 
@@ -1760,8 +1759,7 @@
     gameState = 'title';
     dlog('Engine.showTitle()', 'info');
   };
-  }
-
+  
   // Init
   canvas.width = world.width;
   canvas.height = world.height;
