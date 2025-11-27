@@ -12,6 +12,36 @@
     --accent:#38bdf8;
     --danger:#f97373;
     --chip:#facc15;
+    
+      /* Mobile touch joystick */
+  #touchJoystickBase{
+    position:fixed;
+    width:80px;
+    height:80px;
+    border-radius:9999px;
+    border:1px solid rgba(148,163,184,0.6);
+    background:rgba(15,23,42,0.7);
+    box-shadow:0 0 0 1px rgba(15,23,42,0.9);
+    opacity:0;
+    pointer-events:none;
+    transform:translate(-9999px,-9999px);
+    transition:opacity 0.12s ease-out;
+    z-index:30;
+  }
+  #touchJoystickBase.visible{
+    opacity:1;
+  }
+  #touchJoystickStick{
+    position:absolute;
+    left:20px;
+    top:20px;
+    width:40px;
+    height:40px;
+    border-radius:9999px;
+    background:rgba(148,163,184,0.8);
+    box-shadow:0 0 0 1px rgba(15,23,42,0.9);
+  }
+
   }
   html,body{
     margin:0;
