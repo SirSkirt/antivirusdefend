@@ -10,29 +10,6 @@
   const uiXP = document.getElementById('uiXP');
   const uiLevel = document.getElementById('uiLevel');
 
-  const titleOverlay = document.getElementById('titleOverlay');
-  const btnFreeplay = document.getElementById('btnFreeplay');
-  const btnOptions = document.getElementById('btnOptions');
-  const btnInfo = document.getElementById('btnInfo');
-  const btnQuitTitle = document.getElementById('btnQuitTitle');
-
-  const heroSelectOverlay = document.getElementById('heroSelectOverlay');
-  const heroGrid = document.getElementById('heroGrid');
-  const btnHeroBack = document.getElementById('btnHeroBack');
-  const btnHeroStart = document.getElementById('btnHeroStart');
-
-  const stageOverlay = document.getElementById('stageOverlay');
-  const stageGrid = document.getElementById('stageGrid');
-  const btnStageBack = document.getElementById('btnStageBack');
-  const btnStageStart = document.getElementById('btnStageStart');
-
-  const optionsOverlay = document.getElementById('optionsOverlay');
-  const optVolume = document.getElementById('optVolume');
-  const optParticles = document.getElementById('optParticles');
-  const btnOptionsBack = document.getElementById('btnOptionsBack');
-
-  const infoOverlay = document.getElementById('infoOverlay');
-  const btnInfoBack = document.getElementById('btnInfoBack');
 
   const upgradeOverlay = document.getElementById('upgradeOverlay');
   const upgradeGrid = document.getElementById('upgradeGrid');
@@ -190,64 +167,6 @@
 
   let selectedStageId = 'computer';
   let currentStageId = 'computer';
-
-  function buildStageGrid(){
-    if(!stageGrid){
-      dlog('stageGrid element missing', 'error');
-      return;
-    }
-    stageGrid.innerHTML = '';
-    if(!AVDEF.Stages || !AVDEF.Stages.list){
-      dlog('AVDEF.Stages.list missing', 'error');
-      return;
-    }
-    const stages = AVDEF.Stages.list();
-    dlog('buildStageGrid(): stages length = ' + stages.length, 'info');
-
-    stages.forEach(stage=>{
-      const card = document.createElement('div');
-      card.className = 'stage-card' + (stage.unlocked ? '' : ' locked');
-      card.dataset.stageId = stage.id;
-
-      const nameEl = document.createElement('div');
-      nameEl.className = 'stage-name';
-      nameEl.textContent = stage.name;
-
-      const metaEl = document.createElement('div');
-      metaEl.className = 'stage-meta';
-      metaEl.textContent = stage.unlocked ? stage.desc : 'Locked';
-
-      const lockEl = document.createElement('div');
-      lockEl.className = 'stage-lock';
-      lockEl.textContent = stage.unlocked ? '' : '🔒';
-
-      card.appendChild(nameEl);
-      card.appendChild(metaEl);
-      card.appendChild(lockEl);
-
-      if(stage.unlocked){
-        card.addEventListener('click', ()=>{
-          selectedStageId = stage.id;
-          updateStageCardSelection();
-        });
-      }
-
-      stageGrid.appendChild(card);
-    });
-    updateStageCardSelection();
-  }
-
-  function updateStageCardSelection(){
-    if(!stageGrid) return;
-    const cards = stageGrid.querySelectorAll('.stage-card');
-    cards.forEach(card=>{
-      if(card.dataset.stageId === selectedStageId){
-        card.classList.add('selected');
-      }else{
-        card.classList.remove('selected');
-      }
-    });
-  }
 
   function randRange(min,max){
     return Math.random()*(max-min)+min;
@@ -1434,185 +1353,7 @@
     }
   }
 
-  function showTitle(){
-    if(titleOverlay) titleOverlay.classList.add('visible');
-    if(heroSelectOverlay) heroSelectOverlay.classList.remove('visible');
-    if(stageOverlay) stageOverlay.classList.remove('visible');
-    if(optionsOverlay) optionsOverlay.classList.remove('visible');
-    if(infoOverlay) infoOverlay.classList.remove('visible');
-    if(gameOverOverlay) gameOverOverlay.classList.remove('visible');
-    if(pauseOverlay) pauseOverlay.classList.remove('visible');
-    if(upgradeOverlay) upgradeOverlay.classList.remove('visible');
-    if(ransomBar) ransomBar.classList.remove('visible');
-  }
-
-  function buildHeroGrid(){
-    if(!heroGrid){
-      dlog('heroGrid element missing', 'error');
-      return;
-    }
-    heroGrid.innerHTML = '';
-    if(!AVDEF.Heroes || !AVDEF.Heroes.getAll){
-      dlog('AVDEF.Heroes.getAll missing', 'error');
-      return;
-    }
-    const heroes = AVDEF.Heroes.getAll();
-    dlog('buildHeroGrid(): heroes length = ' + heroes.length, 'info');
-
-    heroes.forEach(hero=>{
-      const card = document.createElement('div');
-      card.className = 'hero-card' + (hero.id === selectedHeroId ? ' selected':'');
-      card.dataset.heroId = hero.id;
-
-      const logo = document.createElement('div');
-      logo.className = 'hero-logo';
-      if(heroImages[hero.id]){
-        logo.style.backgroundImage = `url("${hero.logoUrl}")`;
-      }else{
-        logo.textContent = hero.initial || '?';
-      }
-
-      const nameEl = document.createElement('div');
-      nameEl.className = 'hero-name';
-      nameEl.textContent = hero.name;
-
-      const roleEl = document.createElement('div');
-      roleEl.className = 'hero-role';
-      roleEl.textContent = hero.role;
-
-      const descEl = document.createElement('div');
-      descEl.className = 'hero-desc';
-      descEl.textContent = hero.desc;
-
-      card.appendChild(logo);
-      card.appendChild(nameEl);
-      card.appendChild(roleEl);
-      card.appendChild(descEl);
-
-      card.addEventListener('click', ()=>{
-        selectedHeroId = hero.id;
-        const cards = heroGrid.querySelectorAll('.hero-card');
-        cards.forEach(c=>{
-          if(c.dataset.heroId === selectedHeroId){
-            c.classList.add('selected');
-          }else{
-            c.classList.remove('selected');
-          }
-        });
-      });
-
-      heroGrid.appendChild(card);
-    });
-  }
-
   // --- Button wiring with null checks ---
-
-  if(btnFreeplay){
-    btnFreeplay.addEventListener('click', ()=>{
-      gameState = 'heroSelect';
-      if(titleOverlay) titleOverlay.classList.remove('visible');
-      if(heroSelectOverlay) heroSelectOverlay.classList.add('visible');
-      dlog('btnFreeplay clicked → heroSelect', 'info');
-    });
-  } else dlog('btnFreeplay not found', 'error');
-
-  if(btnOptions && optionsOverlay){
-    btnOptions.addEventListener('click', ()=>{
-      optionsOverlay.classList.add('visible');
-      if(titleOverlay) titleOverlay.classList.remove('visible');
-    });
-  } else if(!btnOptions) dlog('btnOptions not found', 'warn');
-
-  if(btnInfo && infoOverlay){
-    btnInfo.addEventListener('click', ()=>{
-      infoOverlay.classList.add('visible');
-      if(titleOverlay) titleOverlay.classList.remove('visible');
-    });
-  } else if(!btnInfo) dlog('btnInfo not found', 'warn');
-
-  if(btnQuitTitle){
-    btnQuitTitle.addEventListener('click', ()=>{
-      window.location.reload();
-    });
-  } else dlog('btnQuitTitle not found', 'warn');
-
-  if(btnOptionsBack && optionsOverlay){
-    btnOptionsBack.addEventListener('click', ()=>{
-      optionsOverlay.classList.remove('visible');
-      if(titleOverlay) titleOverlay.classList.add('visible');
-    });
-  }
-
-  if(btnInfoBack && infoOverlay){
-    btnInfoBack.addEventListener('click', ()=>{
-      infoOverlay.classList.remove('visible');
-      if(titleOverlay) titleOverlay.classList.add('visible');
-    });
-  }
-
-  if(optVolume){
-    optVolume.addEventListener('input', ()=>{
-      masterVolume = parseFloat(optVolume.value);
-      if(masterGain){
-        masterGain.gain.value = masterVolume;
-      }
-    });
-  }
-
-  if(optParticles){
-    optParticles.addEventListener('change', ()=>{
-      enableParticles = !!optParticles.checked;
-    });
-  }
-
-  if(btnHeroBack && heroSelectOverlay && titleOverlay){
-    btnHeroBack.addEventListener('click', ()=>{
-      heroSelectOverlay.classList.remove('visible');
-      titleOverlay.classList.add('visible');
-      gameState = 'title';
-    });
-  }
-
-  if(btnHeroStart){
-    btnHeroStart.addEventListener('click', ()=>{
-      const hero = AVDEF.Heroes.get(selectedHeroId);
-      if(!hero) {
-        dlog('btnHeroStart: hero not found ' + selectedHeroId, 'error');
-        return;
-      }
-      currentHeroId = hero.id;
-      applyHeroStats(currentHeroId);
-      if(heroSelectOverlay) heroSelectOverlay.classList.remove('visible');
-      buildStageGrid();
-      if(stageOverlay) stageOverlay.classList.add('visible');
-      gameState = 'stageSelect';
-      dlog('btnHeroStart → hero=' + currentHeroId, 'info');
-    });
-  } else dlog('btnHeroStart not found', 'error');
-
-  if(btnStageBack && stageOverlay && heroSelectOverlay){
-    btnStageBack.addEventListener('click', ()=>{
-      stageOverlay.classList.remove('visible');
-      heroSelectOverlay.classList.add('visible');
-      gameState = 'heroSelect';
-    });
-  }
-
-  if(btnStageStart){
-    btnStageStart.addEventListener('click', ()=>{
-      const stage = AVDEF.Stages.get(selectedStageId);
-      if(!stage || !stage.unlocked) return;
-      currentStageId = stage.id;
-      if(stageOverlay) stageOverlay.classList.remove('visible');
-      if(gameOverOverlay) gameOverOverlay.classList.remove('visible');
-      if(upgradeOverlay) upgradeOverlay.classList.remove('visible');
-      if(pauseOverlay) pauseOverlay.classList.remove('visible');
-      resetGame();
-      gameState = 'playing';
-      planWave();
-      dlog('btnStageStart → stage=' + currentStageId, 'info');
-    });
-  } else dlog('btnStageStart not found', 'error');
 
   if(btnRestart){
     btnRestart.addEventListener('click', ()=>{
@@ -1626,8 +1367,13 @@
   if(btnQuit){
     btnQuit.addEventListener('click', ()=>{
       if(gameOverOverlay) gameOverOverlay.classList.remove('visible');
-      showTitle();
-      gameState = 'title';
+      if(window.AVDEF && AVDEF.Title && AVDEF.Title.showTitleScreen){
+        AVDEF.Title.showTitleScreen();
+      } else if(AVDEF.Engine && AVDEF.Engine.showTitle){
+        AVDEF.Engine.showTitle();
+      } else {
+        gameState = 'title';
+      }
     });
   }
 
@@ -1640,8 +1386,13 @@
   if(btnPauseQuit){
     btnPauseQuit.addEventListener('click', ()=>{
       if(pauseOverlay) pauseOverlay.classList.remove('visible');
-      showTitle();
-      gameState = 'title';
+      if(window.AVDEF && AVDEF.Title && AVDEF.Title.showTitleScreen){
+        AVDEF.Title.showTitleScreen();
+      } else if(AVDEF.Engine && AVDEF.Engine.showTitle){
+        AVDEF.Engine.showTitle();
+      } else {
+        gameState = 'title';
+      }
     });
   }
 
@@ -1764,8 +1515,6 @@
   canvas.width = world.width;
   canvas.height = world.height;
   updateHUD();
-  buildHeroGrid();
-  showTitle();
   dlog('Engine init complete, gameState=' + gameState, 'info');
   requestAnimationFrame(loop);
 })();
