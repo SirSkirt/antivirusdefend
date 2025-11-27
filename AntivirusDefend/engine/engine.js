@@ -51,14 +51,6 @@
     width: 960,
     height: 540
   }
-  // Background scrolling state
-  let bgScrollX = 0;
-  let bgScrollY = 0;
-  const BG_TILE = 64;
-  const BG_SCROLL_SPEED = 18; // pixels per second
-;
-
-
   // Logical world size is fixed; canvas pixels scale to fit viewport
   const BASE_WORLD_WIDTH = world.width;
   const BASE_WORLD_HEIGHT = world.height;
@@ -819,10 +811,6 @@
       }
     }
 
-    // Background scroll – gentle diagonal drift
-    bgScrollX += BG_SCROLL_SPEED * 0.4 * dt;
-    bgScrollY += BG_SCROLL_SPEED * dt;
-
     if(!waveInProgress){
       currentWave++;
       if(currentWave === 1){
@@ -1099,121 +1087,101 @@
   }
 
   function drawBackgroundCase(){
-  const w = world.width;
-  const h = world.height;
+    ctx.save();
 
-  // Outer background gradient
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, '#020617');
-  grad.addColorStop(0.4, '#020819');
-  grad.addColorStop(1, '#020617');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+    // Base dark
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0,0,world.width,world.height);
 
-  // Case border
-  const pad = 36;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(148,163,184,0.45)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(pad, pad);
-  ctx.lineTo(w - pad, pad);
-  ctx.lineTo(w - pad, h - pad);
-  ctx.lineTo(pad, h - pad);
-  ctx.closePath();
-  ctx.stroke();
+    const margin = 40;
+    const caseX = margin;
+    const caseY = margin;
+    const caseW = world.width - margin*2;
+    const caseH = world.height - margin*2;
 
-  // Inner neon edge
-  ctx.strokeStyle = 'rgba(56,189,248,0.28)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+    // Case body
+    let g = ctx.createLinearGradient(caseX,caseY,caseX+caseW,caseY+caseH);
+    g.addColorStop(0,'#020617');
+    g.addColorStop(0.4,'#020617');
+    g.addColorStop(1,'#030712');
+    ctx.fillStyle = g;
 
-  // Corner "screws"
-  const screwR = 4;
-  ctx.fillStyle = 'rgba(15,23,42,0.9)';
-  const corners = [
-    [pad + 10, pad + 10],
-    [w - pad - 10, pad + 10],
-    [pad + 10, h - pad - 10],
-    [w - pad - 10, h - pad - 10]
-  ];
-  corners.forEach(([x,y])=>{
+    const radius = 20;
     ctx.beginPath();
-    ctx.arc(x, y, screwR, 0, Math.PI*2);
+    ctx.moveTo(caseX+radius, caseY);
+    ctx.lineTo(caseX+caseW-radius, caseY);
+    ctx.quadraticCurveTo(caseX+caseW, caseY, caseX+caseW, caseY+radius);
+    ctx.lineTo(caseX+caseW, caseY+caseH-radius);
+    ctx.quadraticCurveTo(caseX+caseW, caseY+caseH, caseX+caseW-radius, caseY+caseH);
+    ctx.lineTo(caseX+radius, caseY+caseH);
+    ctx.quadraticCurveTo(caseX, caseY+caseH, caseX, caseY+caseH-radius);
+    ctx.lineTo(caseX, caseY+radius);
+    ctx.quadraticCurveTo(caseX, caseY, caseX+radius, caseY);
+    ctx.closePath();
     ctx.fill();
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(148,163,184,0.6)';
-    ctx.lineWidth = 1;
-    ctx.arc(x, y, screwR, 0, Math.PI*2);
+
+    // Inner glow edge
+    ctx.strokeStyle = 'rgba(148,163,184,0.25)';
+    ctx.lineWidth = 3;
     ctx.stroke();
-  });
 
-  ctx.restore();
-
-  // --- Scrolling inner grid (inside the case) ---
-  const innerPad = pad + 8;
-  const innerW = w - innerPad*2;
-  const innerH = h - innerPad*2;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(innerPad, innerPad, innerW, innerH);
-  ctx.clip();
-
-  // Dark base
-  const coreGrad = ctx.createLinearGradient(0, innerPad, 0, innerPad + innerH);
-  coreGrad.addColorStop(0, '#020617');
-  coreGrad.addColorStop(1, '#02081a');
-  ctx.fillStyle = coreGrad;
-  ctx.fillRect(innerPad, innerPad, innerW, innerH);
-
-  // Scroll offsets
-  const offX = ((bgScrollX % BG_TILE) + BG_TILE) % BG_TILE;
-  const offY = ((bgScrollY % BG_TILE) + BG_TILE) % BG_TILE;
-
-  // Vertical lines
-  ctx.strokeStyle = 'rgba(51,65,85,0.7)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for(let x = innerPad - BG_TILE; x <= innerPad + innerW + BG_TILE; x += BG_TILE){
-    const sx = x + offX;
-    ctx.moveTo(sx, innerPad - BG_TILE);
-    ctx.lineTo(sx, innerPad + innerH + BG_TILE);
-  }
-  ctx.stroke();
-
-  // Horizontal lines
-  ctx.beginPath();
-  for(let y = innerPad - BG_TILE; y <= innerPad + innerH + BG_TILE; y += BG_TILE){
-    const sy = y + offY;
-    ctx.moveTo(innerPad - BG_TILE, sy);
-    ctx.lineTo(innerPad + innerW + BG_TILE, sy);
-  }
-  ctx.stroke();
-
-  // Little "data nodes" at intersections
-  ctx.fillStyle = 'rgba(56,189,248,0.55)';
-  for(let x = innerPad - BG_TILE; x <= innerPad + innerW + BG_TILE; x += BG_TILE){
-    for(let y = innerPad - BG_TILE; y <= innerPad + innerH + BG_TILE; y += BG_TILE){
-      const sx = x + offX;
-      const sy = y + offY;
-      if(sx < innerPad || sx > innerPad+innerW || sy < innerPad || sy > innerPad+innerH) continue;
-      if(((x+y)/BG_TILE) % 4 === 0){
-        ctx.globalAlpha = 0.4 + 0.3 * Math.sin((bgScrollY*0.05) + (x+y)*0.02);
-        ctx.fillRect(sx-1, sy-1, 2, 2);
-      }
+    // PCB glow stripes
+    const stripeCount = 6;
+    for(let i=0;i<stripeCount;i++){
+      const y = caseY + 24 + i*(caseH-60)/(stripeCount-1);
+      const animOffset = (gameTime*40 + i*80)%(caseW+120) - 60;
+      const sx = animOffset + caseX;
+      const ex = sx + 120;
+      const grad = ctx.createLinearGradient(sx,y,ex,y);
+      grad.addColorStop(0,'rgba(56,189,248,0)');
+      grad.addColorStop(0.4,'rgba(56,189,248,0.35)');
+      grad.addColorStop(1,'rgba(56,189,248,0)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(caseX+8,y);
+      ctx.lineTo(caseX+caseW-8,y);
+      ctx.stroke();
     }
-  }
-  ctx.globalAlpha = 1;
 
-  ctx.restore();
+    // Fans (top-left & bottom-right)
+    const fanR = 42;
+    drawFan(caseX+fanR+24, caseY+fanR+24, fanR, 0);
+    drawFan(caseX+caseW-fanR-24, caseY+caseH-fanR-24, fanR, Math.PI);
 
-  // Bottom bezel (for vibe)
-  ctx.save();
-  ctx.fillStyle = 'rgba(15,23,42,0.96)';
-  ctx.fillRect(0, h - 40, w, 40);
-  ctx.restore();
-}function drawXPOrbs(){
+    // Subtle grid overlay inside the case window
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(caseX+radius, caseY+8);
+    ctx.lineTo(caseX+caseW-radius, caseY+8);
+    ctx.quadraticCurveTo(caseX+caseW-8, caseY+8, caseX+caseW-8, caseY+radius);
+    ctx.lineTo(caseX+caseW-8, caseY+caseH-radius);
+    ctx.quadraticCurveTo(caseX+caseW-8, caseY+caseH-8, caseX+caseW-radius, caseY+caseH-8);
+    ctx.lineTo(caseX+radius, caseY+caseH-8);
+    ctx.quadraticCurveTo(caseX+8, caseY+caseH-8, caseX+8, caseY+caseH-radius);
+    ctx.lineTo(caseX+8, caseY+radius);
+    ctx.quadraticCurveTo(caseX+8, caseY+8, caseX+radius, caseY+8);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(30,64,175,0.15)';
+    ctx.lineWidth = 1;
+    for(let x=caseX+16;x<caseX+caseW;x+=40){
+      ctx.beginPath();
+      ctx.moveTo(x,caseY+16);
+      ctx.lineTo(x,caseY+caseH-16);
+      ctx.stroke();
+    }
+    for(let y=caseY+16;y<caseY+caseH;y+=40){
+      ctx.beginPath();
+      ctx.moveTo(caseX+16,y);
+      ctx.lineTo(caseX+caseW-16,y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.restore();
+  }function drawXPOrbs(){
     ctx.save();
     ctx.fillStyle = '#22c55e';
     for(const orb of xpOrbs){
@@ -1415,131 +1383,203 @@
   }
 
 function drawHeroBody(){
-    const hero = AVDEF.Heroes.get(currentHeroId) || {};
+    const hero = AVDEF.Heroes.get(currentHeroId);
     ctx.save();
     ctx.translate(player.x,player.y);
-    ctx.rotate(player.facingAngle);
+    const baseR = player.radius;
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = '#0f172a';
-    ctx.arc(0,0,player.radius+6,0,Math.PI*2);
-    ctx.fill();
+    const bob = Math.sin(gameTime*4)*1.5;
 
-    const hpFrac = player.hp/player.maxHp;
-    ctx.beginPath();
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 4;
-    ctx.arc(0,0,player.radius+4,-Math.PI/2,-Math.PI/2+hpFrac*Math.PI*2);
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    const grad = ctx.createLinearGradient(-player.radius,0,player.radius,0);
-    grad.addColorStop(0,'#38bdf8');
-    grad.addColorStop(1,'#22c55e');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.ellipse(0,0,player.radius*1.2,player.radius,0,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-
-    if(heroImages[currentHeroId]){
+    // Aura / animation per hero
+    if(hero.id === 'avast'){
+      const pulse = 0.5 + 0.5*Math.sin(gameTime*4);
       ctx.save();
-      ctx.rotate(-player.facingAngle);
-      const img = heroImages[currentHeroId];
-      const size = player.radius*1.2;
-      ctx.globalAlpha = 0.95;
-      ctx.drawImage(img,-size*0.7,-size*0.7,size*1.4,size*1.4);
-      ctx.restore();
-    }else{
-      ctx.save();
-      ctx.rotate(-player.facingAngle);
-      ctx.fillStyle = '#0b1120';
+      ctx.globalAlpha = 0.12 + 0.08*pulse;
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0,0,player.radius*0.65,0,Math.PI*2);
-      ctx.fill();
-      ctx.fillStyle = '#e5e7eb';
-      ctx.font = `bold ${player.radius*0.9}px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(hero.initial || '?',0,1);
+      ctx.arc(0,0,baseR+10+4*pulse,0,Math.PI*2);
+      ctx.stroke();
       ctx.restore();
     }
-
-    ctx.save();
-    ctx.strokeStyle = 'rgba(56,189,248,0.55)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(player.radius*0.7,0);
-    ctx.lineTo(player.radius*1.8,0);
-    ctx.stroke();
-    ctx.restore();
-
-    if(gameTime < player.nortonShieldActiveUntil){
-      const t = (player.nortonShieldActiveUntil - gameTime)/3;
-      const blink = 0.6 + 0.4*Math.sin(gameTime*10);
+    if(hero.id === 'norton'){
+      const sweep = gameTime*1.5;
       ctx.save();
-      ctx.globalAlpha = Math.max(0,Math.min(1,t))*blink;
-      const grad2 = ctx.createRadialGradient(0,0,player.radius*0.6,0,0,player.radius*1.7);
-      grad2.addColorStop(0,'rgba(251,191,36,0.1)');
-      grad2.addColorStop(1,'rgba(251,191,36,0.5)');
-      ctx.fillStyle = grad2;
+      ctx.strokeStyle = 'rgba(250,204,21,0.4)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(0,0,player.radius*1.7,0,Math.PI*2);
-      ctx.fill();
+      ctx.arc(0,0,baseR+8,sweep,sweep+Math.PI/3);
+      ctx.stroke();
       ctx.restore();
     }
-
-    if(scanConeEnabled){
+    if(hero.id === 'q360'){
+      const breath = 2 + Math.sin(gameTime*3)*2;
       ctx.save();
-      ctx.globalAlpha = 0.18;
-      const width = Math.PI/6;
-      const start = -width/2;
-      const end = width/2;
-      const r = player.radius*5;
-      const grad = ctx.createRadialGradient(0,0,player.radius*0.4,0,0,r);
-      grad.addColorStop(0,'rgba(56,189,248,0.0)');
-      grad.addColorStop(0.5,'rgba(56,189,248,0.37)');
-      grad.addColorStop(1,'rgba(56,189,248,0.0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(0,0);
-      ctx.arc(0,0,r,start,end);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
-    if(player.orbitLevel>0 && player.orbitProjectiles.length>0){
-      ctx.save();
-      ctx.rotate(-player.facingAngle);
-      for(const orb of player.orbitProjectiles){
-        const ox = Math.cos(orb.angle)*orb.radius;
-        const oy = Math.sin(orb.angle)*orb.radius;
-        ctx.beginPath();
-        ctx.fillStyle = '#38bdf8';
-        ctx.arc(ox,oy,6,0,Math.PI*2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(56,189,248,0.45)';
-        ctx.lineWidth = 1.5;
-        ctx.arc(ox,oy,10,0,Math.PI*2);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-
-    if(gameTime < player.phaseShiftingUntil){
-      const t = (player.phaseShiftingUntil - gameTime)/player.phaseShiftDuration;
-      ctx.save();
-      ctx.globalAlpha = 0.3+0.4*t;
+      ctx.globalAlpha = 0.15;
       ctx.strokeStyle = '#22c55e';
       ctx.lineWidth = 2;
-      ctx.setLineDash([4,4]);
       ctx.beginPath();
-      ctx.arc(0,0,player.radius*1.5,0,Math.PI*2);
+      ctx.arc(0,0,baseR+breath,0,Math.PI*2);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    // Norton emergency shield visual
+    if(hero.id === 'norton' && gameTime < player.nortonShieldActiveUntil){
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0,0,baseR+14,0,Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Body (torso)
+    ctx.save();
+    ctx.translate(0,bob);
+
+    if(hero.id === 'defender'){
+      ctx.fillStyle = '#1d4ed8';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.moveTo(0,-10);
+      ctx.lineTo(10,-3);
+      ctx.lineTo(6,10);
+      ctx.lineTo(-6,10);
+      ctx.lineTo(-10,-3);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(0,-6);
+      ctx.lineTo(6,-1);
+      ctx.lineTo(3,7);
+      ctx.lineTo(-3,7);
+      ctx.lineTo(-6,-1);
+      ctx.closePath();
+      ctx.fill();
+    } else if(hero.id === 'avg'){
+      ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR,0,Math.PI*2);
+      ctx.fill();
+
+      const colors = ['#f97316','#22c55e','#3b82f6','#ef4444'];
+      for(let i=0;i<4;i++){
+        ctx.fillStyle = colors[i];
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        const a0 = i*Math.PI/2;
+        const a1 = (i+1)*Math.PI/2;
+        ctx.arc(0,0,baseR,a0,a1);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else if(hero.id === 'avast'){
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = '#f97316';
+      for(let i=0;i<4;i++){
+        const ang = i*(Math.PI/2);
+        const sx = Math.cos(ang)*(baseR+4);
+        const sy = Math.sin(ang)*(baseR+4);
+        ctx.beginPath();
+        ctx.arc(sx,sy,6,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR-4,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0,0,6,0,Math.PI*2);
+      ctx.fill();
+    } else if(hero.id === 'norton'){
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#facc15';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR,0,Math.PI*2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-5,2);
+      ctx.lineTo(-1,8);
+      ctx.lineTo(8,-4);
+      ctx.stroke();
+    } else if(hero.id === 'mcafee'){
+      ctx.fillStyle = '#b91c1c';
+      ctx.beginPath();
+      ctx.moveTo(0,-baseR);
+      ctx.lineTo(baseR*0.9,-baseR*0.2);
+      ctx.lineTo(baseR*0.6,baseR);
+      ctx.lineTo(-baseR*0.6,baseR);
+      ctx.lineTo(-baseR*0.9,-baseR*0.2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#fef2f2';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-baseR*0.5,0);
+      ctx.lineTo(-baseR*0.25,-baseR*0.3);
+      ctx.lineTo(0,0);
+      ctx.lineTo(baseR*0.25,-baseR*0.3);
+      ctx.lineTo(baseR*0.5,0);
+      ctx.stroke();
+    } else if(hero.id === 'q360'){
+      ctx.fillStyle = '#16a34a';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0,0,baseR-4,Math.PI*0.15,Math.PI*1.85);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e5e7eb';
+      ctx.beginPath();
+      ctx.arc(0,0,5,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Logo head
+    const imgData = heroImages[hero.id];
+    const headOffsetY = -baseR-6 + bob;
+    if(imgData && imgData.ready){
+      const size = baseR*1.6;
+      ctx.save();
+      ctx.translate(0,headOffsetY);
+      ctx.beginPath();
+      ctx.arc(0,0,size*0.52,0,Math.PI*2);
+      ctx.clip();
+      ctx.drawImage(imgData.img,-size/2,-size/2,size,size);
+      ctx.restore();
+    }else{
+      // Simple fallback head
+      ctx.save();
+      ctx.translate(0,headOffsetY);
+      ctx.fillStyle = hero.color || '#e5e7eb';
+      ctx.beginPath();
+      ctx.arc(0,0,baseR*0.8,0,Math.PI*2);
+      ctx.fill();
       ctx.restore();
     }
 
