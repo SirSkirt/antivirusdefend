@@ -50,12 +50,13 @@
   const world = {
     width: 960,
     height: 540
-  };
+  }
   // Background scrolling state
   let bgScrollX = 0;
   let bgScrollY = 0;
   const BG_TILE = 64;
   const BG_SCROLL_SPEED = 18; // pixels per second
+;
 
 
   // Logical world size is fixed; canvas pixels scale to fit viewport
@@ -631,78 +632,93 @@
   let lastPausePressed = false;
   let lastAbilityPressed = false;
 
-// --- Input handling & update loop ---
+  // --- Input handling & update loop ---
 
-function handleInput(dt){
-  const input = getInputState();
+  function handleInput(dt){
+    const input = getInputState();
 
-  // Movement (keyboard / touch joystick / gamepad left stick)
-  let mx = input.moveX || 0;
-  let my = input.moveY || 0;
+    // Movement (keyboard / touch joystick / gamepad left stick)
+    let mx = input.moveX || 0;
+    let my = input.moveY || 0;
 
-  const len = Math.hypot(mx,my);
-  if(len > 1){
-    mx /= len;
-    my /= len;
-  }
-
-  if(len > 0){
-    const effSpeed = player.speed * (gameTime < player.stunnedUntil ? 0.4 : 1);
-    player.x += mx*effSpeed*dt;
-    player.y += my*effSpeed*dt;
-    if(player.x < player.radius) player.x = player.radius;
-    if(player.x > world.width-player.radius) player.x = world.width-player.radius;
-    if(player.y < player.radius) player.y = player.radius;
-    if(player.y > world.height-player.radius) player.y = world.height-player.radius;
-  }
-
-  // Aiming (mouse / touch pointer / gamepad right stick)
-  let tx = player.x + Math.cos(player.facingAngle)*10;
-  let ty = player.y + Math.sin(player.facingAngle)*10;
-
-  if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number'){
-    tx = input.pointerX;
-    ty = input.pointerY;
-  }
-
-  if(typeof input.aimStickX === 'number' && typeof input.aimStickY === 'number'){
-    const ax2 = input.aimStickX;
-    const ay2 = input.aimStickY;
-    const dead2 = 0.25;
-    if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
-      tx = player.x + ax2*200;
-      ty = player.y + ay2*200;
+    const len = Math.hypot(mx,my);
+    if(len > 1){
+      mx /= len;
+      my /= len;
     }
-  }
 
-  const mdx = tx - player.x;
-  const mdy = ty - player.y;
-  if(Math.hypot(mdx,mdy) > 4){
-    player.facingAngle = Math.atan2(mdy,mdx);
-  }
-
-  // NOTE: no shooting here anymore – shooting is handled centrally
-  // in update(dt) using auto-lock, like the old engine.
-
-  // Ability button (space / gamepad A etc)
-  if(input.abilityPressed && !lastAbilityPressed){
-    if(!audioArmed){
-      ensureAudio();
-      audioArmed = true;
+    if(len > 0){
+      const effSpeed = player.speed * (gameTime < player.stunnedUntil ? 0.4 : 1);
+      player.x += mx*effSpeed*dt;
+      player.y += my*effSpeed*dt;
+      if(player.x < player.radius) player.x = player.radius;
+      if(player.x > world.width-player.radius) player.x = world.width-player.radius;
+      if(player.y < player.radius) player.y = player.radius;
+      if(player.y > world.height-player.radius) player.y = world.height-player.radius;
     }
-    tryUseHeroAbility();
-  }
-  lastAbilityPressed = !!input.abilityPressed;
 
-  // Pause button (P / Esc / gamepad Start)
-  if(input.pausePressed && !lastPausePressed){
-    if(gameState === 'playing' || gameState === 'paused'){
-      togglePause();
+    // Aiming (mouse / touch pointer / gamepad right stick)
+    let tx = player.x + Math.cos(player.facingAngle)*10;
+    let ty = player.y + Math.sin(player.facingAngle)*10;
+
+    if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number'){
+      tx = input.pointerX;
+      ty = input.pointerY;
     }
-  }
-  lastPausePressed = !!input.pausePressed;
-}
 
+    if(typeof input.aimStickX === 'number' && typeof input.aimStickY === 'number'){
+      const ax2 = input.aimStickX;
+      const ay2 = input.aimStickY;
+      const dead2 = 0.25;
+      if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
+        tx = player.x + ax2*200;
+        ty = player.y + ay2*200;
+      }
+    }
+
+    const mdx = tx - player.x;
+    const mdy = ty - player.y;
+    if(Math.hypot(mdx,mdy) > 4){
+      player.facingAngle = Math.atan2(mdy,mdx);
+    }
+
+    const now = gameTime;
+    const baseDelay = player.baseFireDelay*player.fireDelayMult;
+    const canShoot = (now - player.lastShot) >= baseDelay;
+    const firing = !!input.firing;
+
+    if(canShoot && firing){
+      if(!audioArmed){
+        ensureAudio();
+        audioArmed = true;
+      }
+      const baseDamage = player.baseDamage*player.damageMult;
+      const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
+      const dmg = baseDamage*stunMult;
+      const kind = (currentHeroId === 'defender' && player.shieldLevel>0) ? 'shield' : 'bullet';
+      spawnProjectile(player.x,player.y,player.facingAngle, 420, dmg, kind);
+      player.lastShot = now;
+      playBeep(620,0.05,0.12);
+    }
+
+    // Ability button (space / gamepad A etc)
+    if(input.abilityPressed && !lastAbilityPressed){
+      if(!audioArmed){
+        ensureAudio();
+        audioArmed = true;
+      }
+      tryUseHeroAbility();
+    }
+    lastAbilityPressed = !!input.abilityPressed;
+
+    // Pause button (P / Esc / gamepad Start)
+    if(input.pausePressed && !lastPausePressed){
+      if(gameState === 'playing' || gameState === 'paused'){
+        togglePause();
+      }
+    }
+    lastPausePressed = !!input.pausePressed;
+  }
 
   function tryUseHeroAbility(){
     const now = gameTime;
@@ -780,49 +796,10 @@ function handleInput(dt){
     }
 
     handleInput(dt);
-      // --- Auto-lock shooting with hero-specific spread (from old engine) ---
 
-  const baseDelay = player.baseFireDelay * player.fireDelayMult;
-  const now = gameTime;
-
-  if(now - player.lastShot >= baseDelay){
-    const targetInfo = vectorToNearestEnemy(player.x, player.y);
-    if(targetInfo){
-      // vectorToNearestEnemy in this engine returns {dx, dy, dist, enemy}
-      let angle = Math.atan2(targetInfo.dy, targetInfo.dx);
-
-      // Default spread, then tweak per hero
-      let spread = 0.20;
-      if(currentHeroId === 'norton') spread = 0.0;
-      else if(currentHeroId === 'avg') spread = 0.15;
-      else if(currentHeroId === 'q360' || currentHeroId === 'total') spread = 0.18;
-      else if(currentHeroId === 'avast') spread = 0.22;
-      else if(currentHeroId === 'mcafee') spread = 0.12;
-
-      angle += randRange(-spread, spread);
-
-      if(!audioArmed){
-        ensureAudio();
-        audioArmed = true;
-      }
-
-      const baseDamage = player.baseDamage * player.damageMult;
-      const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
-      const dmg = baseDamage * stunMult;
-
-      // Defender can throw a shield-flavored basic shot
-      const kind = (currentHeroId === 'defender' && player.shieldLevel > 0)
-        ? 'shield'
-        : 'bullet';
-
-      // Use the old auto-fire speed from the previous engine (260)
-      spawnProjectile(player.x, player.y, angle, 260, dmg, kind);
-      player.lastShot = now;
-      playBeep(620, 0.05, 0.12);
-    }
-  }
-
-    
+    // Background scroll – gentle diagonal drift
+    bgScrollX += BG_SCROLL_SPEED * 0.4 * dt;
+    bgScrollY += BG_SCROLL_SPEED * dt;
 
     if(!waveInProgress){
       currentWave++;
@@ -1100,104 +1077,121 @@ function handleInput(dt){
   }
 
   function drawBackgroundCase(){
-    ctx.save();
+  const w = world.width;
+  const h = world.height;
 
-    // Base dark
-    ctx.fillStyle = '#020617';
-    ctx.fillRect(0,0,world.width,world.height);
+  // Outer background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#020617');
+  grad.addColorStop(0.4, '#020819');
+  grad.addColorStop(1, '#020617');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
 
-    const margin = 40;
-    const caseX = margin;
-    const caseY = margin;
-    const caseW = world.width - margin*2;
-    const caseH = world.height - margin*2;
+  // Case border
+  const pad = 36;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(148,163,184,0.45)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(pad, pad);
+  ctx.lineTo(w - pad, pad);
+  ctx.lineTo(w - pad, h - pad);
+  ctx.lineTo(pad, h - pad);
+  ctx.closePath();
+  ctx.stroke();
 
-    // Case body
-    let g = ctx.createLinearGradient(caseX,caseY,caseX+caseW,caseY+caseH);
-    g.addColorStop(0,'#020617');
-    g.addColorStop(0.4,'#020617');
-    g.addColorStop(1,'#030712');
-    ctx.fillStyle = g;
+  // Inner neon edge
+  ctx.strokeStyle = 'rgba(56,189,248,0.28)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 
-    const radius = 20;
+  // Corner "screws"
+  const screwR = 4;
+  ctx.fillStyle = 'rgba(15,23,42,0.9)';
+  const corners = [
+    [pad + 10, pad + 10],
+    [w - pad - 10, pad + 10],
+    [pad + 10, h - pad - 10],
+    [w - pad - 10, h - pad - 10]
+  ];
+  corners.forEach(([x,y])=>{
     ctx.beginPath();
-    ctx.moveTo(caseX+radius, caseY);
-    ctx.lineTo(caseX+caseW-radius, caseY);
-    ctx.quadraticCurveTo(caseX+caseW, caseY, caseX+caseW, caseY+radius);
-    ctx.lineTo(caseX+caseW, caseY+caseH-radius);
-    ctx.quadraticCurveTo(caseX+caseW, caseY+caseH, caseX+caseW-radius, caseY+caseH);
-    ctx.lineTo(caseX+radius, caseY+caseH);
-    ctx.quadraticCurveTo(caseX, caseY+caseH, caseX, caseY+caseH-radius);
-    ctx.lineTo(caseX, caseY+radius);
-    ctx.quadraticCurveTo(caseX, caseY, caseX+radius, caseY);
-    ctx.closePath();
+    ctx.arc(x, y, screwR, 0, Math.PI*2);
     ctx.fill();
-
-    // Inner glow edge
-    ctx.strokeStyle = 'rgba(148,163,184,0.25)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // PCB glow stripes
-    const stripeCount = 6;
-    for(let i=0;i<stripeCount;i++){
-      const y = caseY + 24 + i*(caseH-60)/(stripeCount-1);
-      const animOffset = (gameTime*40 + i*80)%(caseW+120) - 60;
-      const sx = animOffset + caseX;
-      const ex = sx + 120;
-      const grad = ctx.createLinearGradient(sx,y,ex,y);
-      grad.addColorStop(0,'rgba(56,189,248,0)');
-      grad.addColorStop(0.4,'rgba(56,189,248,0.35)');
-      grad.addColorStop(1,'rgba(56,189,248,0)');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(caseX+8,y);
-      ctx.lineTo(caseX+caseW-8,y);
-      ctx.stroke();
-    }
-
-    // Fans (top-left & bottom-right)
-    const fanR = 42;
-    drawFan(caseX+fanR+24, caseY+fanR+24, fanR, 0);
-    drawFan(caseX+caseW-fanR-24, caseY+caseH-fanR-24, fanR, Math.PI);
-
-    // Subtle grid overlay inside the case window
-    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(caseX+radius, caseY+8);
-    ctx.lineTo(caseX+caseW-radius, caseY+8);
-    ctx.quadraticCurveTo(caseX+caseW-8, caseY+8, caseX+caseW-8, caseY+radius);
-    ctx.lineTo(caseX+caseW-8, caseY+caseH-radius);
-    ctx.quadraticCurveTo(caseX+caseW-8, caseY+caseH-8, caseX+caseW-radius, caseY+caseH-8);
-    ctx.lineTo(caseX+radius, caseY+caseH-8);
-    ctx.quadraticCurveTo(caseX+8, caseY+caseH-8, caseX+8, caseY+caseH-radius);
-    ctx.lineTo(caseX+8, caseY+radius);
-    ctx.quadraticCurveTo(caseX+8, caseY+8, caseX+radius, caseY+8);
-    ctx.closePath();
-    ctx.clip();
-
-    ctx.strokeStyle = 'rgba(30,64,175,0.15)';
+    ctx.strokeStyle = 'rgba(148,163,184,0.6)';
     ctx.lineWidth = 1;
-    for(let x=caseX+16;x<caseX+caseW;x+=40){
-      ctx.beginPath();
-      ctx.moveTo(x,caseY+16);
-      ctx.lineTo(x,caseY+caseH-16);
-      ctx.stroke();
-    }
-    for(let y=caseY+16;y<caseY+caseH;y+=40){
-      ctx.beginPath();
-      ctx.moveTo(caseX+16,y);
-      ctx.lineTo(caseX+caseW-16,y);
-      ctx.stroke();
-    }
-    ctx.restore();
+    ctx.arc(x, y, screwR, 0, Math.PI*2);
+    ctx.stroke();
+  });
 
-    ctx.restore();
+  ctx.restore();
+
+  // --- Scrolling inner grid (inside the case) ---
+  const innerPad = pad + 8;
+  const innerW = w - innerPad*2;
+  const innerH = h - innerPad*2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(innerPad, innerPad, innerW, innerH);
+  ctx.clip();
+
+  // Dark base
+  const coreGrad = ctx.createLinearGradient(0, innerPad, 0, innerPad + innerH);
+  coreGrad.addColorStop(0, '#020617');
+  coreGrad.addColorStop(1, '#02081a');
+  ctx.fillStyle = coreGrad;
+  ctx.fillRect(innerPad, innerPad, innerW, innerH);
+
+  // Scroll offsets
+  const offX = ((bgScrollX % BG_TILE) + BG_TILE) % BG_TILE;
+  const offY = ((bgScrollY % BG_TILE) + BG_TILE) % BG_TILE;
+
+  // Vertical lines
+  ctx.strokeStyle = 'rgba(51,65,85,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let x = innerPad - BG_TILE; x <= innerPad + innerW + BG_TILE; x += BG_TILE){
+    const sx = x + offX;
+    ctx.moveTo(sx, innerPad - BG_TILE);
+    ctx.lineTo(sx, innerPad + innerH + BG_TILE);
   }
+  ctx.stroke();
 
-  
-  function drawXPOrbs(){
+  // Horizontal lines
+  ctx.beginPath();
+  for(let y = innerPad - BG_TILE; y <= innerPad + innerH + BG_TILE; y += BG_TILE){
+    const sy = y + offY;
+    ctx.moveTo(innerPad - BG_TILE, sy);
+    ctx.lineTo(innerPad + innerW + BG_TILE, sy);
+  }
+  ctx.stroke();
+
+  // Little "data nodes" at intersections
+  ctx.fillStyle = 'rgba(56,189,248,0.55)';
+  for(let x = innerPad - BG_TILE; x <= innerPad + innerW + BG_TILE; x += BG_TILE){
+    for(let y = innerPad - BG_TILE; y <= innerPad + innerH + BG_TILE; y += BG_TILE){
+      const sx = x + offX;
+      const sy = y + offY;
+      if(sx < innerPad || sx > innerPad+innerW || sy < innerPad || sy > innerPad+innerH) continue;
+      if(((x+y)/BG_TILE) % 4 === 0){
+        ctx.globalAlpha = 0.4 + 0.3 * Math.sin((bgScrollY*0.05) + (x+y)*0.02);
+        ctx.fillRect(sx-1, sy-1, 2, 2);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // Bottom bezel (for vibe)
+  ctx.save();
+  ctx.fillStyle = 'rgba(15,23,42,0.96)';
+  ctx.fillRect(0, h - 40, w, 40);
+  ctx.restore();
+}function drawXPOrbs(){
     ctx.save();
     ctx.fillStyle = '#22c55e';
     for(const orb of xpOrbs){
@@ -1592,7 +1586,7 @@ function drawHeroBody(){
     ctx.restore();
   }
 
- function drawHUD(){
+  function drawHUD(){
   const barWidth  = 220;
   const barHeight = 12;
   const margin    = 16;
@@ -1649,9 +1643,9 @@ function drawHeroBody(){
 
   // --- Labels & numbers ---
   ctx.fillStyle = '#e5e7eb';
-  ctx.fillText(`Wave`, startX, startY - 14);
-  ctx.fillText(`LVL`,  startX + barWidth + 50, startY - 14);
-  ctx.fillText(`Chips`,startX + barWidth + 50, startY + barHeight + 6);
+  ctx.fillText('Wave', startX, startY - 14);
+  ctx.fillText('LVL',  startX + barWidth + 50, startY - 14);
+  ctx.fillText('Chips',startX + barWidth + 50, startY + barHeight + 6);
 
   ctx.fillStyle = '#38bdf8';
   ctx.fillText(String(currentWave), startX + 40, startY - 14);
@@ -1690,15 +1684,12 @@ function drawHeroBody(){
 
   // Number overlays
   ctx.fillStyle = '#0b1120';
-  ctx.fillText(`${player.hp}/${player.maxHp}`, startX + 6, startY - 2);
+  ctx.fillText(player.hp + '/' + player.maxHp, startX + 6, startY - 2);
   ctx.fillStyle = '#052e16';
-  ctx.fillText(`${player.xp}/${player.xpToNext}`, startX + 6, startY + barHeight + 10);
+  ctx.fillText(player.xp + '/' + player.xpToNext, startX + 6, startY + barHeight + 10);
 
   ctx.restore();
-}
-
-  
-function draw(){
+}function draw(){
     if (!canvas || !ctx) return;
 
     // Clear in raw canvas pixels
