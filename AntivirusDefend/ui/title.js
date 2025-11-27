@@ -357,4 +357,4 @@
   }else{
     initTitleLayer();
   }
-})();
+};
