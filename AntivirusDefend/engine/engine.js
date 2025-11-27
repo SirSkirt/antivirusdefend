@@ -549,60 +549,18 @@
     }
   }
 
-  // Enemy factory
-  function spawnEnemy(type){
-    let x,y;
-    const edge = Math.floor(Math.random()*4);
-    const margin = 40;
-    if(edge===0){
-      x = Math.random()*world.width;
-      y = -margin;
-    }else if(edge===1){
-      x = Math.random()*world.width;
-      y = world.height+margin;
-    }else if(edge===2){
-      x = -margin;
-      y = Math.random()*world.height;
-    }else{
-      x = world.width+margin;
-      y = Math.random()*world.height;
-    }
-    const e = {
-      id: nextEnemyId++,
-      type,
-      x,y,
-      vx:0,vy:0,
-      radius: 14,
-      speed: 60,
-      hp: 1,
-      maxHp: 1,
-      disguised: false,
-      stolenAbility: null,
-      lastAttack: 0,
-      slowUntil: 0,
-      confusedUntil: 0,
-      xpValue: 6
-    };
-    if(type==='adware'){
-      e.speed = 75;
-      e.hp = e.maxHp = 20 + currentWave*3;
-      e.xpValue = 7;
-    }else if(type==='spyware'){
-      e.speed = 70;
-      e.hp = e.maxHp = 25 + currentWave*4;
-      e.xpValue = 8;
-    }else if(type==='virus'){
-      e.speed = 80;
-      e.hp = e.maxHp = 35 + currentWave*5;
-      e.disguised = true;
-      e.xpValue = 10;
-    }else if(type==='ransomware'){
-      e.speed = 60;
-      e.hp = e.maxHp = 80 + currentWave*10;
-      e.xpValue = 18;
-    }
-    enemies.push(e);
-  }
+  // Enemy factory, now stored in separate javascript file
+ function spawnEnemy(type) {
+  const pos = pickSpawnEdge(); // your existing function
+  const enemy = AVDEF.Enemies.create(type, {
+    wave: currentWave,
+    x: pos.x,
+    y: pos.y,
+    idGen: () => nextEnemyId++
+  });
+
+  enemies.push(enemy);
+}
 
   function activateNortonShield(duration,stage){
     player.nortonShieldStage = stage;
