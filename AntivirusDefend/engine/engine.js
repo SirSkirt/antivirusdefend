@@ -1962,7 +1962,7 @@
     heroSelectOverlay.classList.add('visible');
   });
 
-  btnStageStart.addEventListener('click', ()=>{
+   btnStageStart.addEventListener('click', ()=>{
     const stage = AVDEF.Stages.get(selectedStageId);
     if(!stage || !stage.unlocked) return;
     currentStageId = stage.id;
@@ -1974,6 +1974,7 @@
     gameState = 'playing';
     planWave();
   });
+
 
   btnPauseResume.addEventListener('click', ()=>{
     resumeGame();
