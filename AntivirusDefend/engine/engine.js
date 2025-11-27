@@ -1587,49 +1587,110 @@ function drawHeroBody(){
     ctx.restore();
   }
 
-  function drawHUD(){
-    const barWidth = 220;
-    const barHeight = 12;
-    const margin = 16;
-    const startX = margin;
-    const startY = world.height-50;
+ function drawHUD(){
+  const barWidth  = 220;
+  const barHeight = 12;
+  const margin    = 16;
 
-    ctx.save();
-    ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    ctx.fillStyle = '#e5e7eb';
-    ctx.textBaseline = 'top';
+  // Draw relative to the logical world size, not raw canvas pixels
+  const startX = margin;
+  const startY = world.height - 60;
 
-    ctx.fillText(`Wave ${currentWave}`, startX, startY-18);
-    ctx.fillText(`LVL ${player.level}`, startX+barWidth+40, startY-18);
-    ctx.fillText(`Chips ${chips.count}`, startX+barWidth+40, startY+barHeight+4);
+  ctx.save();
+  ctx.font = '11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.textBaseline = 'top';
 
-    ctx.fillStyle = 'rgba(15,23,42,0.9)';
-    ctx.fillRect(startX-6,startY-6,barWidth+12,barHeight+12);
-    ctx.fillRect(startX-6,startY+barHeight+8,barWidth+12,barHeight+12);
+  // --- Glassy background panel ---
+  const panelWidth  = barWidth + 140;
+  const panelHeight = 52;
 
-    ctx.fillStyle = '#020617';
-    ctx.fillRect(startX-4,startY-4,barWidth+8,barHeight+8);
-    ctx.fillRect(startX-4,startY+barHeight+10,barWidth+8,barHeight+8);
+  const gradPanel = ctx.createLinearGradient(startX, startY, startX, startY + panelHeight);
+  gradPanel.addColorStop(0, 'rgba(15,23,42,0.96)');
+  gradPanel.addColorStop(1, 'rgba(15,23,42,0.88)');
 
-    const hpFrac = player.hp/player.maxHp;
-    ctx.fillStyle = '#f97373';
-    ctx.fillRect(startX-2,startY-2,(barWidth+4)*hpFrac,barHeight+4);
-    ctx.fillStyle = 'rgba(15,23,42,0.8)';
-    ctx.fillRect(startX-2,startY-2,barWidth+4,barHeight+4);
+  ctx.fillStyle = gradPanel;
+  ctx.beginPath();
+  const r = 10;
+  const x0 = startX - 10;
+  const y0 = startY - 16;
+  const x1 = x0 + panelWidth;
+  const y1 = y0 + panelHeight;
+  ctx.moveTo(x0 + r, y0);
+  ctx.lineTo(x1 - r, y0);
+  ctx.quadraticCurveTo(x1, y0, x1, y0 + r);
+  ctx.lineTo(x1, y1 - r);
+  ctx.quadraticCurveTo(x1, y1, x1 - r, y1);
+  ctx.lineTo(x0 + r, y1);
+  ctx.quadraticCurveTo(x0, y1, x0, y1 - r);
+  ctx.lineTo(x0, y0 + r);
+  ctx.quadraticCurveTo(x0, y0, x0 + r, y0);
+  ctx.fill();
 
-    const xpFrac = player.xp/player.xpToNext;
-    ctx.fillStyle = '#22c55e';
-    ctx.fillRect(startX-2,startY+barHeight+12,(barWidth+4)*xpFrac,barHeight+4);
-    ctx.fillStyle = 'rgba(15,23,42,0.8)';
-    ctx.fillRect(startX-2,startY+barHeight+12,barWidth+4,barHeight+4);
+  // Border glow
+  ctx.strokeStyle = 'rgba(56,189,248,0.35)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 
-    ctx.fillStyle = '#f97373';
-    ctx.fillText(`${player.hp}/${player.maxHp}`, startX+6, startY-2);
-    ctx.fillStyle = '#22c55e';
-    ctx.fillText(`${player.xp}/${player.xpToNext}`, startX+6, startY+barHeight+10);
-
-    ctx.restore();
+  // Subtle scanline overlay
+  ctx.globalAlpha = 0.16;
+  ctx.beginPath();
+  for(let y = y0 + 4; y < y1; y += 4){
+    ctx.moveTo(x0+4, y);
+    ctx.lineTo(x1-4, y);
   }
+  ctx.strokeStyle = 'rgba(15,23,42,0.9)';
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // --- Labels & numbers ---
+  ctx.fillStyle = '#e5e7eb';
+  ctx.fillText(`Wave`, startX, startY - 14);
+  ctx.fillText(`LVL`,  startX + barWidth + 50, startY - 14);
+  ctx.fillText(`Chips`,startX + barWidth + 50, startY + barHeight + 6);
+
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillText(String(currentWave), startX + 40, startY - 14);
+  ctx.fillText(String(player.level), startX + barWidth + 82, startY - 14);
+  ctx.fillStyle = '#facc15';
+  ctx.fillText(String(chips.count), startX + barWidth + 96, startY + barHeight + 6);
+
+  // --- HP Bar ---
+  const hpFrac = Math.max(0, Math.min(1, player.hp / player.maxHp));
+  const xpFrac = Math.max(0, Math.min(1, player.xp / player.xpToNext));
+
+  // Outer frames
+  ctx.fillStyle = 'rgba(15,23,42,0.95)';
+  ctx.fillRect(startX - 4, startY - 4, barWidth + 8, barHeight + 8);
+  ctx.fillRect(startX - 4, startY + barHeight + 10, barWidth + 8, barHeight + 8);
+
+  // Inner background
+  ctx.fillStyle = '#020617';
+  ctx.fillRect(startX - 2, startY - 2, barWidth + 4, barHeight + 4);
+  ctx.fillRect(startX - 2, startY + barHeight + 12, barWidth + 4, barHeight + 4);
+
+  // HP gradient
+  const hpGrad = ctx.createLinearGradient(startX - 2, startY, startX + barWidth + 2, startY);
+  hpGrad.addColorStop(0, '#ef4444');
+  hpGrad.addColorStop(0.5, '#f97373');
+  hpGrad.addColorStop(1, '#fecaca');
+  ctx.fillStyle = hpGrad;
+  ctx.fillRect(startX - 2, startY - 2, (barWidth + 4) * hpFrac, barHeight + 4);
+
+  // XP gradient
+  const xpGrad = ctx.createLinearGradient(startX - 2, startY + barHeight + 12, startX + barWidth + 2, startY + barHeight + 12);
+  xpGrad.addColorStop(0, '#22c55e');
+  xpGrad.addColorStop(1, '#bbf7d0');
+  ctx.fillStyle = xpGrad;
+  ctx.fillRect(startX - 2, startY + barHeight + 12, (barWidth + 4) * xpFrac, barHeight + 4);
+
+  // Number overlays
+  ctx.fillStyle = '#0b1120';
+  ctx.fillText(`${player.hp}/${player.maxHp}`, startX + 6, startY - 2);
+  ctx.fillStyle = '#052e16';
+  ctx.fillText(`${player.xp}/${player.xpToNext}`, startX + 6, startY + barHeight + 10);
+
+  ctx.restore();
+}
 
   
 function draw(){
