@@ -249,27 +249,14 @@
 
   // HERO DATA moved to heroes/heroes.js
 
-  const STAGES = [
-    {
-      id:'computer',
-      name:'Computer',
-      desc:'Standard desktop case interior – the current battlefield.',
-      difficulty:'Normal',
-      unlocked:true
-    },
-    { id:'laptop', name:'Laptop', desc:'Compact thermal chaos.', difficulty:'Locked', unlocked:false },
-    { id:'datacenter', name:'Datacenter', desc:'Racks, cables, and lag.', difficulty:'Locked', unlocked:false },
-    { id:'smartphone', name:'Smartphone', desc:'Touchscreen territory.', difficulty:'Locked', unlocked:false },
-    { id:'router', name:'Router', desc:'Packets, ports, and pings.', difficulty:'Locked', unlocked:false },
-    { id:'bios', name:'BIOS', desc:'Low-level panic zone.', difficulty:'Locked', unlocked:false }
-  ];
+  // STAGES moved to stages/stages.js
 
   let selectedStageId = 'computer';
   let currentStageId = 'computer';
 
   function buildStageGrid(){
     stageGrid.innerHTML = '';
-    STAGES.forEach(stage=>{
+    AVDEF.Stages.list().forEach(stage=>{
       const card = document.createElement('div');
       card.className = 'stage-card' + (stage.unlocked ? '' : ' locked');
       card.dataset.stageId = stage.id;
@@ -642,101 +629,15 @@
   }
 
   // Upgrades
-  const BASE_UPGRADES = [
-    {
-      id:'fireRate',
-      name:'Software Update',
-      desc:'Increases attack speed by 15%.',
-      apply(){
-        player.fireDelayMult *= 0.85;
-      }
-    },
-    {
-      id:'damage',
-      name:'Virus Definitions Update',
-      desc:'Increases damage by 20%.',
-      apply(){
-        player.damageMult *= 1.20;
-      }
-    },
-    {
-      id:'defenderOrbit',
-      name:'Defender Shield',
-      desc:'Adds or strengthens orbiting Defender shields.',
-      apply(){
-        player.orbitLevel++;
-        if(!player.abilities.includes('orbit')){
-          player.abilities.push('orbit');
-        }
-      }
-    }
-  ];
+  // BASE_UPGRADES moved to upgrades/upgrades.js
 
-  function heroSpecificUpgrades(){
-    const list = [];
-    if(currentHeroId === 'defender'){
-      list.push({
-        id:'wd_shield',
-        name:'Shield Toss Upgrade',
-        desc:'Your Defender shield toss hits harder and slightly faster.',
-        apply(){
-          player.shieldLevel++;
-          player.damageMult *= 1.10;
-          player.fireDelayMult *= 0.95;
-        }
-      });
-    }else if(currentHeroId === 'avg'){
-      list.push({
-        id:'avg_slow',
-        name:'Digital Antibodies',
-        desc:'Antibody shots slow and confuse enemies for longer.',
-        apply(){
-          player.slowLevel++;
-        }
-      });
-    }else if(currentHeroId === 'avast'){
-      list.push({
-        id:'avast_aoe',
-        name: player.aoeModePaid ? 'Paid Subscription Boost' : 'Upgrade to Paid Version',
-        desc: player.aoeModePaid
-          ? 'Stronger knockback pulses and more chaos between enemies.'
-          : 'Unlock the paid version: stronger pulses, faster speed, and chaos.',
-        apply(){
-          if(!player.aoeModePaid){
-            player.aoeModePaid = true;
-            player.aoeLevel++;
-            player.speed += 25;
-          }else{
-            player.aoeLevel++;
-          }
-        }
-      });
-    }else if(currentHeroId === 'norton'){
-      list.push({
-        id:'norton_beam',
-        name:'Beam Optimisation',
-        desc:'Beam combos hit harder and ramp damage faster.',
-        apply(){
-          player.beamLevel++;
-        }
-      });
-    }else if(currentHeroId === 'mcafee'){
-      list.push({
-        id:'mcafee_tag',
-        name:'Tag Team Training',
-        desc:'Defender ally lasts longer and hits harder.',
-        apply(){
-          player.tagLevel++;
-        }
-      });
-    }
-    return list;
-  }
+    // heroSpecificUpgrades moved to upgrades/upgrades.js
+}
 
   function showUpgradeChoices(source){
     source = source || 'wave'; // 'wave' or 'xp'
     upgradeGrid.innerHTML = '';
-    const pool = BASE_UPGRADES.concat(heroSpecificUpgrades());
+    const pool = AVDEF.Upgrades.getPool(currentHeroId, player);
     const picks = [];
     const poolCopy = pool.slice();
     const count = Math.min(3,poolCopy.length);
@@ -2062,8 +1963,8 @@
   });
 
   btnStageStart.addEventListener('click', ()=>{
-    const stage = STAGES.find(s=>s.id === selectedStageId && s.unlocked);
-    if(!stage) return;
+    const stage = AVDEF.Stages.get(selectedStageId);
+    if(!stage || !stage.unlocked) return;
     currentStageId = stage.id;
     stageOverlay.classList.remove('visible');
     gameOverOverlay.classList.remove('visible');
