@@ -626,93 +626,78 @@
   let lastPausePressed = false;
   let lastAbilityPressed = false;
 
-  // --- Input handling & update loop ---
+// --- Input handling & update loop ---
 
-  function handleInput(dt){
-    const input = getInputState();
+function handleInput(dt){
+  const input = getInputState();
 
-    // Movement (keyboard / touch joystick / gamepad left stick)
-    let mx = input.moveX || 0;
-    let my = input.moveY || 0;
+  // Movement (keyboard / touch joystick / gamepad left stick)
+  let mx = input.moveX || 0;
+  let my = input.moveY || 0;
 
-    const len = Math.hypot(mx,my);
-    if(len > 1){
-      mx /= len;
-      my /= len;
-    }
-
-    if(len > 0){
-      const effSpeed = player.speed * (gameTime < player.stunnedUntil ? 0.4 : 1);
-      player.x += mx*effSpeed*dt;
-      player.y += my*effSpeed*dt;
-      if(player.x < player.radius) player.x = player.radius;
-      if(player.x > world.width-player.radius) player.x = world.width-player.radius;
-      if(player.y < player.radius) player.y = player.radius;
-      if(player.y > world.height-player.radius) player.y = world.height-player.radius;
-    }
-
-    // Aiming (mouse / touch pointer / gamepad right stick)
-    let tx = player.x + Math.cos(player.facingAngle)*10;
-    let ty = player.y + Math.sin(player.facingAngle)*10;
-
-    if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number'){
-      tx = input.pointerX;
-      ty = input.pointerY;
-    }
-
-    if(typeof input.aimStickX === 'number' && typeof input.aimStickY === 'number'){
-      const ax2 = input.aimStickX;
-      const ay2 = input.aimStickY;
-      const dead2 = 0.25;
-      if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
-        tx = player.x + ax2*200;
-        ty = player.y + ay2*200;
-      }
-    }
-
-    const mdx = tx - player.x;
-    const mdy = ty - player.y;
-    if(Math.hypot(mdx,mdy) > 4){
-      player.facingAngle = Math.atan2(mdy,mdx);
-    }
-
-    const now = gameTime;
-    const baseDelay = player.baseFireDelay*player.fireDelayMult;
-    const canShoot = (now - player.lastShot) >= baseDelay;
-    const firing = !!input.firing;
-
-    if(canShoot && firing){
-      if(!audioArmed){
-        ensureAudio();
-        audioArmed = true;
-      }
-      const baseDamage = player.baseDamage*player.damageMult;
-      const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
-      const dmg = baseDamage*stunMult;
-      const kind = (currentHeroId === 'defender' && player.shieldLevel>0) ? 'shield' : 'bullet';
-      spawnProjectile(player.x,player.y,player.facingAngle, 420, dmg, kind);
-      player.lastShot = now;
-      playBeep(620,0.05,0.12);
-    }
-
-    // Ability button (space / gamepad A etc)
-    if(input.abilityPressed && !lastAbilityPressed){
-      if(!audioArmed){
-        ensureAudio();
-        audioArmed = true;
-      }
-      tryUseHeroAbility();
-    }
-    lastAbilityPressed = !!input.abilityPressed;
-
-    // Pause button (P / Esc / gamepad Start)
-    if(input.pausePressed && !lastPausePressed){
-      if(gameState === 'playing' || gameState === 'paused'){
-        togglePause();
-      }
-    }
-    lastPausePressed = !!input.pausePressed;
+  const len = Math.hypot(mx,my);
+  if(len > 1){
+    mx /= len;
+    my /= len;
   }
+
+  if(len > 0){
+    const effSpeed = player.speed * (gameTime < player.stunnedUntil ? 0.4 : 1);
+    player.x += mx*effSpeed*dt;
+    player.y += my*effSpeed*dt;
+    if(player.x < player.radius) player.x = player.radius;
+    if(player.x > world.width-player.radius) player.x = world.width-player.radius;
+    if(player.y < player.radius) player.y = player.radius;
+    if(player.y > world.height-player.radius) player.y = world.height-player.radius;
+  }
+
+  // Aiming (mouse / touch pointer / gamepad right stick)
+  let tx = player.x + Math.cos(player.facingAngle)*10;
+  let ty = player.y + Math.sin(player.facingAngle)*10;
+
+  if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number'){
+    tx = input.pointerX;
+    ty = input.pointerY;
+  }
+
+  if(typeof input.aimStickX === 'number' && typeof input.aimStickY === 'number'){
+    const ax2 = input.aimStickX;
+    const ay2 = input.aimStickY;
+    const dead2 = 0.25;
+    if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
+      tx = player.x + ax2*200;
+      ty = player.y + ay2*200;
+    }
+  }
+
+  const mdx = tx - player.x;
+  const mdy = ty - player.y;
+  if(Math.hypot(mdx,mdy) > 4){
+    player.facingAngle = Math.atan2(mdy,mdx);
+  }
+
+  // NOTE: no shooting here anymore – shooting is handled centrally
+  // in update(dt) using auto-lock, like the old engine.
+
+  // Ability button (space / gamepad A etc)
+  if(input.abilityPressed && !lastAbilityPressed){
+    if(!audioArmed){
+      ensureAudio();
+      audioArmed = true;
+    }
+    tryUseHeroAbility();
+  }
+  lastAbilityPressed = !!input.abilityPressed;
+
+  // Pause button (P / Esc / gamepad Start)
+  if(input.pausePressed && !lastPausePressed){
+    if(gameState === 'playing' || gameState === 'paused'){
+      togglePause();
+    }
+  }
+  lastPausePressed = !!input.pausePressed;
+}
+
 
   function tryUseHeroAbility(){
     const now = gameTime;
@@ -790,6 +775,49 @@
     }
 
     handleInput(dt);
+      // --- Auto-lock shooting with hero-specific spread (from old engine) ---
+
+  const baseDelay = player.baseFireDelay * player.fireDelayMult;
+  const now = gameTime;
+
+  if(now - player.lastShot >= baseDelay){
+    const targetInfo = vectorToNearestEnemy(player.x, player.y);
+    if(targetInfo){
+      // vectorToNearestEnemy in this engine returns {dx, dy, dist, enemy}
+      let angle = Math.atan2(targetInfo.dy, targetInfo.dx);
+
+      // Default spread, then tweak per hero
+      let spread = 0.20;
+      if(currentHeroId === 'norton') spread = 0.0;
+      else if(currentHeroId === 'avg') spread = 0.15;
+      else if(currentHeroId === 'q360' || currentHeroId === 'total') spread = 0.18;
+      else if(currentHeroId === 'avast') spread = 0.22;
+      else if(currentHeroId === 'mcafee') spread = 0.12;
+
+      angle += randRange(-spread, spread);
+
+      if(!audioArmed){
+        ensureAudio();
+        audioArmed = true;
+      }
+
+      const baseDamage = player.baseDamage * player.damageMult;
+      const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
+      const dmg = baseDamage * stunMult;
+
+      // Defender can throw a shield-flavored basic shot
+      const kind = (currentHeroId === 'defender' && player.shieldLevel > 0)
+        ? 'shield'
+        : 'bullet';
+
+      // Use the old auto-fire speed from the previous engine (260)
+      spawnProjectile(player.x, player.y, angle, 260, dmg, kind);
+      player.lastShot = now;
+      playBeep(620, 0.05, 0.12);
+    }
+  }
+
+    
 
     if(!waveInProgress){
       currentWave++;
