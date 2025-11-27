@@ -24,6 +24,7 @@
   const optionsOverlay    = document.getElementById('optionsOverlay');
   const optVolume         = document.getElementById('optVolume');
   const optParticles      = document.getElementById('optParticles');
+  const optFullscreen     = document.getElementById('optFullscreen'); // <– add this
   const btnOptionsBack    = document.getElementById('btnOptionsBack');
 
   const infoOverlay       = document.getElementById('infoOverlay');
@@ -32,6 +33,20 @@
   // Local selection state for this UI layer
   let selectedHeroId  = Engine.getHero  ? (Engine.getHero()  || 'defender') : 'defender';
   let selectedStageId = Engine.getStage ? (Engine.getStage() || 'computer') : 'computer';
+
+    function setFullscreen(enabled){
+    const elem = document.documentElement; // you could use a wrapper div if you prefer
+    if(enabled){
+      if(!document.fullscreenElement && elem.requestFullscreen){
+        elem.requestFullscreen();
+      }
+    }else{
+      if(document.fullscreenElement && document.exitFullscreen){
+        document.exitFullscreen();
+      }
+    }
+  }
+
 
   // --- Helper: show/hide overlays like a tiny window manager ---
 
@@ -218,9 +233,13 @@
     if (optParticles) {
       optParticles.checked = !!opts.particles;
     }
+    if (optFullscreen) {
+      optFullscreen.checked = !!document.fullscreenElement;
+    }
   }
 
-  function wireOptionsEvents() {
+
+   function wireOptionsEvents() {
     if (optVolume) {
       optVolume.addEventListener('input', function () {
         const val = parseFloat(optVolume.value);
@@ -242,6 +261,19 @@
             particles: !!optParticles.checked
           });
         }
+      });
+    }
+
+    if (optFullscreen) {
+      optFullscreen.addEventListener('change', function () {
+        // This is a direct user gesture, so fullscreen API is allowed
+        setFullscreen(optFullscreen.checked);
+      });
+
+      // Keep checkbox in sync if user hits ESC to exit fullscreen
+      document.addEventListener('fullscreenchange', function () {
+        if (!optFullscreen) return;
+        optFullscreen.checked = !!document.fullscreenElement;
       });
     }
   }
