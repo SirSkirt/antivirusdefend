@@ -975,54 +975,141 @@
   }
 
   // --- Drawing ---
-  function drawBackgroundCase(){
-    const grad = ctx.createLinearGradient(0,0,0,canvas.height);
-    grad.addColorStop(0,'#020617');
-    grad.addColorStop(1,'#0b1120');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
+  function drawFan(cx, cy, r, tOffset){
+    const t = gameTime*2 + tOffset;
     ctx.save();
-    ctx.strokeStyle = 'rgba(148,163,184,0.18)';
-    ctx.lineWidth = 2;
-    const pad = 40;
+    ctx.translate(cx, cy);
+
+    // Outer ring
+    ctx.fillStyle = '#020617';
     ctx.beginPath();
-    ctx.moveTo(pad,pad);
-    ctx.lineTo(canvas.width-pad,pad);
-    ctx.lineTo(canvas.width-pad,canvas.height-pad);
-    ctx.lineTo(pad,canvas.height-pad);
-    ctx.closePath();
+    ctx.arc(0,0,r+4,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(15,23,42,0.9)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
     ctx.stroke();
-    ctx.restore();
 
-    ctx.save();
-    ctx.strokeStyle = 'rgba(56,189,248,0.18)';
-    ctx.lineWidth = 1;
-    const cols = 6;
-    const rows = 3;
-    const pad2 = 40;
-    for(let i=1;i<cols;i++){
-      const x = pad2 + (canvas.width-2*pad2)*(i/cols);
+    // Blades
+    ctx.rotate(t);
+    ctx.fillStyle = 'rgba(56,189,248,0.65)';
+    for(let i=0;i<3;i++){
+      ctx.rotate((Math.PI*2)/3);
       ctx.beginPath();
-      ctx.moveTo(x,pad2);
-      ctx.lineTo(x,canvas.height-pad2);
-      ctx.stroke();
+      ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(r*0.8,-r*0.15,0,-r);
+      ctx.quadraticCurveTo(-r*0.4,-r*0.1,0,0);
+      ctx.fill();
     }
-    for(let j=1;j<rows;j++){
-      const y = pad2 + (canvas.height-2*pad2)*(j/rows);
-      ctx.beginPath();
-      ctx.moveTo(pad2,y);
-      ctx.lineTo(canvas.width-pad2,y);
-      ctx.stroke();
-    }
-    ctx.restore();
 
-    ctx.save();
-    ctx.fillStyle = 'rgba(15,23,42,0.9)';
-    ctx.fillRect(0,canvas.height-60,canvas.width,60);
+    // Glow
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.arc(0,0,r+8,0,Math.PI*2);
+    ctx.stroke();
     ctx.restore();
   }
 
+  function drawBackgroundCase(){
+    ctx.save();
+
+    // Base dark
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0,0,world.width,world.height);
+
+    const margin = 40;
+    const caseX = margin;
+    const caseY = margin;
+    const caseW = world.width - margin*2;
+    const caseH = world.height - margin*2;
+
+    // Case body
+    let g = ctx.createLinearGradient(caseX,caseY,caseX+caseW,caseY+caseH);
+    g.addColorStop(0,'#020617');
+    g.addColorStop(0.4,'#020617');
+    g.addColorStop(1,'#030712');
+    ctx.fillStyle = g;
+
+    const radius = 20;
+    ctx.beginPath();
+    ctx.moveTo(caseX+radius, caseY);
+    ctx.lineTo(caseX+caseW-radius, caseY);
+    ctx.quadraticCurveTo(caseX+caseW, caseY, caseX+caseW, caseY+radius);
+    ctx.lineTo(caseX+caseW, caseY+caseH-radius);
+    ctx.quadraticCurveTo(caseX+caseW, caseY+caseH, caseX+caseW-radius, caseY+caseH);
+    ctx.lineTo(caseX+radius, caseY+caseH);
+    ctx.quadraticCurveTo(caseX, caseY+caseH, caseX, caseY+caseH-radius);
+    ctx.lineTo(caseX, caseY+radius);
+    ctx.quadraticCurveTo(caseX, caseY, caseX+radius, caseY);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner glow edge
+    ctx.strokeStyle = 'rgba(148,163,184,0.25)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // PCB glow stripes
+    const stripeCount = 6;
+    for(let i=0;i<stripeCount;i++){
+      const y = caseY + 24 + i*(caseH-60)/(stripeCount-1);
+      const animOffset = (gameTime*40 + i*80)%(caseW+120) - 60;
+      const sx = animOffset + caseX;
+      const ex = sx + 120;
+      const grad = ctx.createLinearGradient(sx,y,ex,y);
+      grad.addColorStop(0,'rgba(56,189,248,0)');
+      grad.addColorStop(0.4,'rgba(56,189,248,0.35)');
+      grad.addColorStop(1,'rgba(56,189,248,0)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(caseX+8,y);
+      ctx.lineTo(caseX+caseW-8,y);
+      ctx.stroke();
+    }
+
+    // Fans (top-left & bottom-right)
+    const fanR = 42;
+    drawFan(caseX+fanR+24, caseY+fanR+24, fanR, 0);
+    drawFan(caseX+caseW-fanR-24, caseY+caseH-fanR-24, fanR, Math.PI);
+
+    // Subtle grid overlay inside the case window
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(caseX+radius, caseY+8);
+    ctx.lineTo(caseX+caseW-radius, caseY+8);
+    ctx.quadraticCurveTo(caseX+caseW-8, caseY+8, caseX+caseW-8, caseY+radius);
+    ctx.lineTo(caseX+caseW-8, caseY+caseH-radius);
+    ctx.quadraticCurveTo(caseX+caseW-8, caseY+caseH-8, caseX+caseW-radius, caseY+caseH-8);
+    ctx.lineTo(caseX+radius, caseY+caseH-8);
+    ctx.quadraticCurveTo(caseX+8, caseY+caseH-8, caseX+8, caseY+caseH-radius);
+    ctx.lineTo(caseX+8, caseY+radius);
+    ctx.quadraticCurveTo(caseX+8, caseY+8, caseX+radius, caseY+8);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(30,64,175,0.15)';
+    ctx.lineWidth = 1;
+    for(let x=caseX+16;x<caseX+caseW;x+=40){
+      ctx.beginPath();
+      ctx.moveTo(x,caseY+16);
+      ctx.lineTo(x,caseY+caseH-16);
+      ctx.stroke();
+    }
+    for(let y=caseY+16;y<caseY+caseH;y+=40){
+      ctx.beginPath();
+      ctx.moveTo(caseX+16,y);
+      ctx.lineTo(caseX+caseW-16,y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  
   function drawXPOrbs(){
     ctx.save();
     ctx.fillStyle = '#22c55e';
@@ -1048,49 +1135,183 @@
     ctx.restore();
   }
 
-  function drawEnemies(){
+    function drawEnemies(){
     ctx.save();
+// Enemies
     for(const e of enemies){
       ctx.save();
       ctx.translate(e.x,e.y);
-      const slowActive = gameTime < e.slowUntil;
-      const confusedActive = gameTime < e.confusedUntil;
-      const radius = e.radius;
 
-      ctx.beginPath();
-      ctx.fillStyle = '#0f172a';
-      ctx.arc(0,0,radius+6,0,Math.PI*2);
-      ctx.fill();
+      // Small per-enemy bob for life
+      const bob = Math.sin(gameTime*4 + e.id)*1.5;
+      ctx.translate(0,bob);
 
-      const hpFrac = e.hp/e.maxHp;
-      ctx.beginPath();
-      ctx.strokeStyle = '#f97373';
-      ctx.lineWidth = 3;
-      ctx.arc(0,0,radius+4, -Math.PI/2, -Math.PI/2 + hpFrac*Math.PI*2);
-      ctx.stroke();
+      if(e.type==='adware'){
+        // Adware: pop-up window / webpage ad look
+        const w = e.radius*2.6;
+        const h = e.radius*1.8;
+        const wiggle = Math.sin(gameTime*8 + e.id)*2;
+        ctx.translate(wiggle,0);
 
-      ctx.beginPath();
-      ctx.fillStyle = slowActive ? '#22c55e' : (confusedActive ? '#fbbf24' : '#e5e7eb');
-      ctx.arc(0,0,radius,0,Math.PI*2);
-      ctx.fill();
+        // Window background
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.roundRect(-w/2,-h/2,w,h,4);
+        ctx.fill();
 
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(-radius/3,-radius/3,3,0,Math.PI*2);
-      ctx.arc(radius/3,-radius/3,3,0,Math.PI*2);
-      ctx.fill();
+        // Title bar
+        ctx.fillStyle = '#1f2937';
+        ctx.beginPath();
+        ctx.roundRect(-w/2,-h/2,w,8,{tl:4,tr:4,br:0,bl:0});
+        ctx.fill();
 
-      ctx.beginPath();
-      ctx.fillStyle = e.disguised ? '#fb7185' : '#22d3ee';
-      ctx.arc(0,radius/3,4,0,Math.PI*2);
-      ctx.fill();
+        // "Close" buttons
+        ctx.fillStyle = '#f97373';
+        ctx.beginPath();
+        ctx.arc(-w/2+6,-h/2+4,2,0,Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(-w/2+12,-h/2+4,2,0,Math.PI*2);
+        ctx.fill();
 
+        // Flashing banner
+        const pulse = 0.5 + 0.5*Math.sin(gameTime*10 + e.id);
+        ctx.fillStyle = `rgba(250,204,21,${0.35+pulse*0.3})`;
+        ctx.fillRect(-w/2+4,-h/2+10,w-8,6);
+
+        ctx.fillStyle = '#e5e7eb';
+        ctx.font = '8px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('AD',0,-h/2+16);
+
+        // Text block lines
+        ctx.strokeStyle = 'rgba(148,163,184,0.5)';
+        ctx.lineWidth = 1;
+        for(let i=0;i<3;i++){
+          const yy = -h/2+24+i*5;
+          ctx.beginPath();
+          ctx.moveTo(-w/2+6,yy);
+          ctx.lineTo(w/2-6,yy);
+          ctx.stroke();
+        }
+      }else if(e.type==='spyware'){
+        // Spyware: eye that tracks the player
+        const eyeW = e.radius*2.3;
+        const eyeH = e.radius*1.4;
+
+        // Eye white
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.ellipse(0,0,eyeW/2,eyeH/2,0,0,Math.PI*2);
+        ctx.fill();
+
+        // Direction towards player
+        const dxp = player.x - e.x;
+        const dyp = player.y - e.y;
+        const ang = Math.atan2(dyp,dxp);
+        const pupilOffset = 4;
+        const px = Math.cos(ang)*pupilOffset;
+        const py = Math.sin(ang)*pupilOffset;
+
+        // Pupil
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(px,py,7,0,Math.PI*2);
+        ctx.fill();
+
+        // Highlight
+        ctx.fillStyle = '#e5e7eb';
+        ctx.beginPath();
+        ctx.arc(px+3,py-3,3,0,Math.PI*2);
+        ctx.fill();
+      }else if(e.type==='virus'){
+        const defImgData = heroImages['defender'];
+        if(e.disguised && defImgData && defImgData.ready){
+          const size = e.radius*2.4;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(0,0,size*0.52,0,Math.PI*2);
+          ctx.clip();
+          ctx.drawImage(defImgData.img,-size/2,-size/2,size,size);
+          ctx.restore();
+        }else if(e.disguised){
+          ctx.fillStyle = '#38bdf8';
+          ctx.beginPath();
+          ctx.arc(0,0,e.radius,0,Math.PI*2);
+          ctx.fill();
+        }else{
+          // Animated purple spiky ball
+          ctx.save();
+          ctx.rotate(gameTime*1.8);
+          ctx.strokeStyle = '#a855f7';
+          ctx.beginPath();
+          const spikes = 8;
+          const outer = e.radius+4;
+          for(let k=0;k<spikes;k++){
+            const ang = k/spikes*Math.PI*2;
+            const sx2 = Math.cos(ang)*outer;
+            const sy2 = Math.sin(ang)*outer;
+            ctx.moveTo(0,0);
+            ctx.lineTo(sx2,sy2);
+          }
+          ctx.stroke();
+
+          const pulse = 1 + 0.2*Math.sin(gameTime*6 + e.id);
+          ctx.fillStyle = '#a855f7';
+          ctx.beginPath();
+          ctx.arc(0,0,(e.radius-3)*pulse,0,Math.PI*2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }else if(e.type==='ransomware'){
+        // Ransomware: bouncing lock
+        const lockW = e.radius*2.2;
+        const lockH = e.radius*2.0;
+        const bounce = Math.sin(gameTime*3 + e.id)*2;
+        ctx.translate(0,bounce);
+
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.roundRect(-lockW/2,-lockH/2,lockW,lockH,4);
+        ctx.fill();
+
+        ctx.strokeStyle = '#854d0e';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-lockW/2,-lockH/2,lockW,lockH);
+
+        // Shackle
+        ctx.beginPath();
+        ctx.arc(0,-lockH/2,8,Math.PI*0.15,Math.PI*0.85);
+        ctx.stroke();
+
+        // Keyhole
+        ctx.beginPath();
+        ctx.arc(0,-2,3,0,Math.PI*2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0,1);
+        ctx.lineTo(0,7);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Enemy HP bar
+      ctx.save();
+      ctx.translate(e.x,e.y-4);
+      const ratio = e.hp/e.maxHp;
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(-14,-20,28,4);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(-14,-20,28*ratio,4);
       ctx.restore();
     }
+
+    
     ctx.restore();
   }
 
-  function drawHeroBody(){
+function drawHeroBody(){
     const hero = AVDEF.Heroes.get(currentHeroId) || {};
     ctx.save();
     ctx.translate(player.x,player.y);
