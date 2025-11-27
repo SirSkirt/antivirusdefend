@@ -51,6 +51,45 @@
     width: 960,
     height: 540
   };
+  
+    // Keep a fixed logical world, but scale the visible canvas
+  const BASE_WORLD_WIDTH = world.width;
+  const BASE_WORLD_HEIGHT = world.height;
+
+  function resizeGameCanvas(){
+    if (!canvas) return;
+
+    const targetAspect = BASE_WORLD_WIDTH / BASE_WORLD_HEIGHT;
+
+    const header = document.querySelector('.page-header');
+    const headerHeight = header ? header.getBoundingClientRect().height : 0;
+
+    // Available viewport area for the game
+    const vw = window.innerWidth;
+    const vh = window.innerHeight - headerHeight - 24; // a bit of padding
+
+    const availWidth  = Math.max(320, vw - 24);   // don’t go crazy small
+    const availHeight = Math.max(240, vh);
+
+    const availAspect = availWidth / availHeight;
+
+    let displayWidth, displayHeight;
+    if (availAspect > targetAspect) {
+      // Limited by height
+      displayHeight = availHeight;
+      displayWidth  = displayHeight * targetAspect;
+    } else {
+      // Limited by width
+      displayWidth  = availWidth;
+      displayHeight = displayWidth / targetAspect;
+    }
+
+    // We keep canvas.width/height = world size (960×540),
+    // and only scale the CSS box. All drawing still uses world coords.
+    canvas.style.width  = displayWidth + 'px';
+    canvas.style.height = displayHeight + 'px';
+  }
+
 
   let gameState = 'title'; // 'title','heroSelect','stageSelect','playing','paused','upgrading','gameover'
   let currentMode = 'survivors';
@@ -1732,10 +1771,16 @@ function drawHeroBody(){
     dlog('Engine.showTitle()', 'info');
   };
   
-  // Init
+   // Init
   canvas.width = world.width;
   canvas.height = world.height;
+
+  // First responsive size
+  resizeGameCanvas();
+  window.addEventListener('resize', resizeGameCanvas);
+
   updateHUD();
   dlog('Engine init complete, gameState=' + gameState, 'info');
   requestAnimationFrame(loop);
 })();
+
