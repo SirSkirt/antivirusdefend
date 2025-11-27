@@ -1,12 +1,10 @@
-// Hero definitions module placeholder.
-// Move HEROES data and hero-related helpers here.
 // ===== HEROES MODULE =====
-// Exports hero stats and simple helper functions.
+// Hero definitions module.
+// Extracted from engine.js
 
 window.AVDEF = window.AVDEF || {};
 
-AVDEF.Heroes = (() => {
-
+AVDEF.Heroes = (function() {
   const HEROES = {
     defender:{
       id:'defender',
@@ -20,20 +18,18 @@ AVDEF.Heroes = (() => {
       color:'#1d4ed8',
       logoUrl:"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Windows-defender.svg/240px-Windows-defender.svg.png"
     },
-
     avg:{
       id:'avg',
       name:'AVG',
-      role:'Slow + Confuse',
-      desc:'Slows and confuses enemies while maintaining steady fire rate.',
-      speed:210,
-      baseDamage:10,
-      fireDelay:0.75,
+      role:'Slow but strong',
+      desc:'Older antivirus. Slower, harder-hitting shots that debuff threats.',
+      speed:200,
+      baseDamage:16,
+      fireDelay:0.8,
       initial:'A',
       color:'#f97316',
       logoUrl:"https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/AVG_Similar_Icon.svg/960px-AVG_Similar_Icon.svg.png?20200830015222"
     },
-
     avast:{
       id:'avast',
       name:'Avast',
@@ -46,30 +42,40 @@ AVDEF.Heroes = (() => {
       color:'#f97316',
       logoUrl:"https://upload.wikimedia.org/wikipedia/commons/4/4e/Avast_Software_white_logo.png?20190728134047"
     },
-
     norton:{
       id:'norton',
       name:'Norton',
-      role:'Beam & emergency shield',
-      desc:'Shoots piercing beams and can deploy an emergency shield.',
-      speed:215,
-      baseDamage:13,
+      role:'Beam DPS & shields',
+      desc:'Grandfather AV. Rolling turret with beam combos and emergency shields.',
+      speed:195,
+      baseDamage:18,
       fireDelay:0.85,
       initial:'N',
-      color:'#fbbf24',
+      color:'#facc15',
       logoUrl:"https://cdn.brandfetch.io/idooDSluCu/theme/light/symbol.svg?c=1dxbfHSJFAPEGdCLU4o5B"
     },
-
-    total:{
-      id:'total',
+    mcafee:{
+      id:'mcafee',
+      name:'McAfee',
+      role:'Tag Team',
+      desc:'Best when paired with Defender. Can call in a Defender ally.',
+      speed:215,
+      baseDamage:14,
+      fireDelay:0.7,
+      initial:'M',
+      color:'#b91c1c',
+      logoUrl:"https://companieslogo.com/img/orig/MCFE-d6ec69dd.png?t=1720244492"
+    },
+    q360:{
+      id:'q360',
       name:'360 Total Security',
-      role:'Orbit Shields',
-      desc:'Summons orbiting shields to bodyguard your CPU.',
-      speed:225,
-      baseDamage:10,
-      fireDelay:0.75,
-      initial:'TS',
-      color:'#22c55e',
+      role:'Agile',
+      desc:'Fast, rounded stats for aggressive play.',
+      speed:245,
+      baseDamage:11,
+      fireDelay:0.6,
+      initial:'360',
+      color:'#16a34a',
       logoUrl:"https://packagestore.com/wp-content/uploads/2023/07/0D56757242667073F5E9610001F2E43A.png"
     }
   };
@@ -78,6 +84,5 @@ AVDEF.Heroes = (() => {
     getAll: () => Object.values(HEROES),
     get: (id) => HEROES[id] || HEROES.defender
   };
-
 })();
 
