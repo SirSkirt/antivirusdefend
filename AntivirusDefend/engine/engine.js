@@ -254,7 +254,7 @@
   let selectedStageId = 'computer';
   let currentStageId = 'computer';
 
-  function buildStageGrid(){
+   function buildStageGrid(){
     stageGrid.innerHTML = '';
     AVDEF.Stages.list().forEach(stage=>{
       const card = document.createElement('div');
@@ -299,7 +299,7 @@
       }
     });
   }
-
+  
   // In-canvas logo images (for heads & virus mimic)
   const heroImages = {};
   function preloadHeroLogos(){
