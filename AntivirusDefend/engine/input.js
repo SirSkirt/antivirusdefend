@@ -5,6 +5,34 @@
   const canvas = document.getElementById('gameCanvas');
   const touchJoystickBase = document.getElementById('touchJoystickBase');
   const touchJoystickStick = document.getElementById('touchJoystickStick');
+    
+  // Match joystick size to the game canvas scale
+  const BASE_WORLD_WIDTH = 960;  // must match engine world.width
+
+  function resizeTouchControls(){
+    if (!touchJoystickBase || !touchJoystickStick) return;
+
+    let referenceWidth = window.innerWidth;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0) {
+        referenceWidth = rect.width;
+      }
+    }
+
+    // Scale relative to the original world width
+    const scale = referenceWidth / BASE_WORLD_WIDTH;
+
+    const baseSize  = 120 * scale; // outer circle
+    const stickSize = 72  * scale; // inner circle
+
+    touchJoystickBase.style.width  = baseSize  + 'px';
+    touchJoystickBase.style.height = baseSize  + 'px';
+
+    touchJoystickStick.style.width  = stickSize + 'px';
+    touchJoystickStick.style.height = stickSize + 'px';
+  }
+
 
   // Keyboard state
   const keys = {
@@ -277,3 +305,31 @@
     canvas.addEventListener('touchcancel', onTouchEnd, { passive:false });
   }
 })();
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
+  if (canvas) {
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive:false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive:false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive:false });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive:false });
+  }
+
+  // Responsive joystick sizing
+  function initResponsiveInput(){
+    resizeTouchControls();
+    window.addEventListener('resize', resizeTouchControls);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initResponsiveInput);
+  } else {
+    initResponsiveInput();
+  }
+})();
+
