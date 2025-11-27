@@ -1,5 +1,6 @@
 // title.js
- function(){
+(function () {
+  // Ensure AVDEF exists
   window.AVDEF = window.AVDEF || {};
   const Engine = AVDEF.Engine || {};
 
@@ -29,12 +30,12 @@
   const btnInfoBack       = document.getElementById('btnInfoBack');
 
   // Local selection state for this UI layer
-  let selectedHeroId  = Engine.getHero ? Engine.getHero() : 'defender';
-  let selectedStageId = Engine.getStage ? Engine.getStage() : 'computer';
+  let selectedHeroId  = Engine.getHero  ? (Engine.getHero()  || 'defender') : 'defender';
+  let selectedStageId = Engine.getStage ? (Engine.getStage() || 'computer') : 'computer';
 
   // --- Helper: show/hide overlays like a tiny window manager ---
 
-  function showOnly(overlay){
+  function showOnly(overlay) {
     const overlays = [
       titleOverlay,
       heroSelectOverlay,
@@ -42,68 +43,65 @@
       optionsOverlay,
       infoOverlay
     ];
-    overlays.forEach(el=>{
-      if(!el) return;
-      if(el === overlay){
+
+    overlays.forEach(function (el) {
+      if (!el) return;
+      if (el === overlay) {
         el.classList.add('visible');
-      }else{
+      } else {
         el.classList.remove('visible');
       }
     });
   }
 
-  function showTitle(){
+  function showTitle() {
     showOnly(titleOverlay);
-    if(Engine.showTitle){
+    if (Engine.showTitle) {
       Engine.showTitle();
     }
   }
-  // Expose a small API so engine.js can request the title screen
-  AVDEF.Title = AVDEF.Title || {};
-  AVDEF.Title.showTitleScreen = showTitle;
 
-
-  function showHeroSelect(){
+  function showHeroSelect() {
     showOnly(heroSelectOverlay);
   }
 
-  function showStageSelect(){
+  function showStageSelect() {
     showOnly(stageOverlay);
   }
 
-  function showOptions(){
+  function showOptions() {
     showOnly(optionsOverlay);
   }
 
-  function showInfo(){
+  function showInfo() {
     showOnly(infoOverlay);
   }
 
   // --- HERO GRID ---
 
-  function buildHeroGrid(){
-    if(!heroGrid){
+  function buildHeroGrid() {
+    if (!heroGrid) {
       console.warn('[title.js] heroGrid element missing');
       return;
     }
     heroGrid.innerHTML = '';
 
-    if(!AVDEF.Heroes || !AVDEF.Heroes.getAll){
+    if (!AVDEF.Heroes || !AVDEF.Heroes.getAll) {
       console.warn('[title.js] AVDEF.Heroes.getAll missing');
       return;
     }
 
     const heroes = AVDEF.Heroes.getAll();
-    heroes.forEach(hero=>{
+    heroes.forEach(function (hero) {
       const card = document.createElement('div');
-      card.className = 'hero-card' + (hero.id === selectedHeroId ? ' selected':'');
+      card.className = 'hero-card' + (hero.id === selectedHeroId ? ' selected' : '');
       card.dataset.heroId = hero.id;
 
       const logo = document.createElement('div');
       logo.className = 'hero-logo';
-      if(hero.logoUrl){
-        logo.style.backgroundImage = `url("${hero.logoUrl}")`;
-      }else{
+      if (hero.logoUrl) {
+        logo.style.backgroundImage = 'url("' + hero.logoUrl + '")';
+      } else {
         logo.textContent = hero.initial || '?';
       }
 
@@ -124,17 +122,17 @@
       card.appendChild(roleEl);
       card.appendChild(descEl);
 
-      card.addEventListener('click', ()=>{
+      card.addEventListener('click', function () {
         selectedHeroId = hero.id;
-        if(Engine.setHero){
+        if (Engine.setHero) {
           Engine.setHero(selectedHeroId);
         }
 
         const cards = heroGrid.querySelectorAll('.hero-card');
-        cards.forEach(c=>{
-          if(c.dataset.heroId === selectedHeroId){
+        cards.forEach(function (c) {
+          if (c.dataset.heroId === selectedHeroId) {
             c.classList.add('selected');
-          }else{
+          } else {
             c.classList.remove('selected');
           }
         });
@@ -146,21 +144,21 @@
 
   // --- STAGE GRID ---
 
-  function buildStageGrid(){
-    if(!stageGrid){
+  function buildStageGrid() {
+    if (!stageGrid) {
       console.warn('[title.js] stageGrid element missing');
       return;
     }
     stageGrid.innerHTML = '';
 
-    if(!AVDEF.Stages || !AVDEF.Stages.list){
+    if (!AVDEF.Stages || !AVDEF.Stages.list) {
       console.warn('[title.js] AVDEF.Stages.list missing');
       return;
     }
 
     const stages = AVDEF.Stages.list();
 
-    stages.forEach(stage=>{
+    stages.forEach(function (stage) {
       const card = document.createElement('div');
       card.className = 'stage-card' + (stage.unlocked ? '' : ' locked');
       card.dataset.stageId = stage.id;
@@ -181,10 +179,10 @@
       card.appendChild(metaEl);
       card.appendChild(lockEl);
 
-      if(stage.unlocked){
-        card.addEventListener('click', ()=>{
+      if (stage.unlocked) {
+        card.addEventListener('click', function () {
           selectedStageId = stage.id;
-          if(Engine.setStage){
+          if (Engine.setStage) {
             Engine.setStage(selectedStageId);
           }
           updateStageCardSelection();
@@ -197,13 +195,13 @@
     updateStageCardSelection();
   }
 
-  function updateStageCardSelection(){
-    if(!stageGrid) return;
+  function updateStageCardSelection() {
+    if (!stageGrid) return;
     const cards = stageGrid.querySelectorAll('.stage-card');
-    cards.forEach(card=>{
-      if(card.dataset.stageId === selectedStageId){
+    cards.forEach(function (card) {
+      if (card.dataset.stageId === selectedStageId) {
         card.classList.add('selected');
-      }else{
+      } else {
         card.classList.remove('selected');
       }
     });
@@ -211,22 +209,22 @@
 
   // --- OPTIONS BINDING ---
 
-  function initOptionsFromEngine(){
-    if(!Engine.getOptions) return;
+  function initOptionsFromEngine() {
+    if (!Engine.getOptions) return;
     const opts = Engine.getOptions();
-    if(optVolume && typeof opts.volume === 'number'){
+    if (optVolume && typeof opts.volume === 'number') {
       optVolume.value = String(opts.volume);
     }
-    if(optParticles){
+    if (optParticles) {
       optParticles.checked = !!opts.particles;
     }
   }
 
-  function wireOptionsEvents(){
-    if(optVolume){
-      optVolume.addEventListener('input', ()=>{
+  function wireOptionsEvents() {
+    if (optVolume) {
+      optVolume.addEventListener('input', function () {
         const val = parseFloat(optVolume.value);
-        if(Engine.setOptions){
+        if (Engine.setOptions) {
           Engine.setOptions({
             volume: isNaN(val) ? 0.5 : val,
             particles: optParticles ? !!optParticles.checked : true
@@ -235,9 +233,9 @@
       });
     }
 
-    if(optParticles){
-      optParticles.addEventListener('change', ()=>{
-        if(Engine.setOptions){
+    if (optParticles) {
+      optParticles.addEventListener('change', function () {
+        if (Engine.setOptions) {
           const val = parseFloat(optVolume ? optVolume.value : '0.5');
           Engine.setOptions({
             volume: isNaN(val) ? 0.5 : val,
@@ -250,45 +248,44 @@
 
   // --- BUTTON WIRING ---
 
-  function wireButtons(){
+  function wireButtons() {
     // Title buttons
-    if(btnFreeplay){
-      btnFreeplay.addEventListener('click', ()=>{
+    if (btnFreeplay) {
+      btnFreeplay.addEventListener('click', function () {
         showHeroSelect();
       });
     }
 
-    if(btnOptions){
-      btnOptions.addEventListener('click', ()=>{
+    if (btnOptions) {
+      btnOptions.addEventListener('click', function () {
         initOptionsFromEngine();
         showOptions();
       });
     }
 
-    if(btnInfo){
-      btnInfo.addEventListener('click', ()=>{
+    if (btnInfo) {
+      btnInfo.addEventListener('click', function () {
         showInfo();
       });
     }
 
-    if(btnQuitTitle){
-      btnQuitTitle.addEventListener('click', ()=>{
+    if (btnQuitTitle) {
+      btnQuitTitle.addEventListener('click', function () {
         // Same behaviour as before: just reload the page
         window.location.reload();
       });
     }
 
     // Hero select buttons
-    if(btnHeroBack){
-      btnHeroBack.addEventListener('click', ()=>{
+    if (btnHeroBack) {
+      btnHeroBack.addEventListener('click', function () {
         showTitle();
       });
     }
 
-    if(btnHeroStart){
-      btnHeroStart.addEventListener('click', ()=>{
-        // We assume selectedHeroId has been kept in sync already
-        if(Engine.setHero){
+    if (btnHeroStart) {
+      btnHeroStart.addEventListener('click', function () {
+        if (Engine.setHero) {
           Engine.setHero(selectedHeroId);
         }
         buildStageGrid();
@@ -297,18 +294,18 @@
     }
 
     // Stage select buttons
-    if(btnStageBack){
-      btnStageBack.addEventListener('click', ()=>{
+    if (btnStageBack) {
+      btnStageBack.addEventListener('click', function () {
         showHeroSelect();
       });
     }
 
-    if(btnStageStart){
-      btnStageStart.addEventListener('click', ()=>{
-        if(Engine.setStage){
+    if (btnStageStart) {
+      btnStageStart.addEventListener('click', function () {
+        if (Engine.setStage) {
           Engine.setStage(selectedStageId);
         }
-        if(Engine.startRun){
+        if (Engine.startRun) {
           Engine.startRun();
         }
         // Once the game starts, hide all pre-game overlays
@@ -317,29 +314,28 @@
     }
 
     // Options back
-    if(btnOptionsBack){
-      btnOptionsBack.addEventListener('click', ()=>{
+    if (btnOptionsBack) {
+      btnOptionsBack.addEventListener('click', function () {
         showTitle();
       });
     }
 
     // Info back
-    if(btnInfoBack){
-      btnInfoBack.addEventListener('click', ()=>{
+    if (btnInfoBack) {
+      btnInfoBack.addEventListener('click', function () {
         showTitle();
       });
     }
   }
-  
 
   // --- INIT ---
 
-  function initTitleLayer(){
+  function initTitleLayer() {
     // Seed local hero/stage from engine, if provided
-    if(Engine.getHero){
+    if (Engine.getHero) {
       selectedHeroId = Engine.getHero() || selectedHeroId;
     }
-    if(Engine.getStage){
+    if (Engine.getStage) {
       selectedStageId = Engine.getStage() || selectedStageId;
     }
 
@@ -350,11 +346,15 @@
 
     // Start on the title screen
     showTitle();
+
+    // Expose a tiny API for engine to call back to title
+    AVDEF.Title = AVDEF.Title || {};
+    AVDEF.Title.showTitleScreen = showTitle;
   }
 
-  if(document.readyState === 'loading'){
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initTitleLayer);
-  }else{
+  } else {
     initTitleLayer();
   }
-};
+})();
