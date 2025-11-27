@@ -51,6 +51,11 @@
     width: 960,
     height: 540
   };
+  // Background scrolling state
+  let bgScrollX = 0;
+  let bgScrollY = 0;
+  const BG_TILE = 64;
+  const BG_SCROLL_SPEED = 18; // pixels per second
 
 
   // Logical world size is fixed; canvas pixels scale to fit viewport
