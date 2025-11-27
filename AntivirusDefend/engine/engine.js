@@ -682,24 +682,8 @@
       player.facingAngle = Math.atan2(mdy,mdx);
     }
 
-    const now = gameTime;
-    const baseDelay = player.baseFireDelay*player.fireDelayMult;
-    const canShoot = (now - player.lastShot) >= baseDelay;
-    const firing = !!input.firing;
-
-    if(canShoot && firing){
-      if(!audioArmed){
-        ensureAudio();
-        audioArmed = true;
-      }
-      const baseDamage = player.baseDamage*player.damageMult;
-      const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
-      const dmg = baseDamage*stunMult;
-      const kind = (currentHeroId === 'defender' && player.shieldLevel>0) ? 'shield' : 'bullet';
-      spawnProjectile(player.x,player.y,player.facingAngle, 420, dmg, kind);
-      player.lastShot = now;
-      playBeep(620,0.05,0.12);
-    }
+    // NOTE: no shooting here anymore – shooting is handled centrally
+    // in update(dt) using auto-lock.
 
     // Ability button (space / gamepad A etc)
     if(input.abilityPressed && !lastAbilityPressed){
@@ -796,6 +780,44 @@
     }
 
     handleInput(dt);
+
+    // --- Auto-lock shooting with hero-specific spread ---
+    const baseDelay = player.baseFireDelay * player.fireDelayMult;
+    const nowShoot = gameTime;
+
+    if(nowShoot - player.lastShot >= baseDelay){
+      const targetInfo = vectorToNearestEnemy(player.x, player.y);
+      if(targetInfo){
+        let angle = Math.atan2(targetInfo.dy, targetInfo.dx);
+
+        // Default spread, tweaked per hero
+        let spread = 0.20;
+        if(currentHeroId === 'norton') spread = 0.0;
+        else if(currentHeroId === 'avg') spread = 0.15;
+        else if(currentHeroId === 'q360' || currentHeroId === 'total') spread = 0.18;
+        else if(currentHeroId === 'avast') spread = 0.22;
+        else if(currentHeroId === 'mcafee') spread = 0.12;
+
+        angle += randRange(-spread, spread);
+
+        if(!audioArmed){
+          ensureAudio();
+          audioArmed = true;
+        }
+
+        const baseDamage = player.baseDamage * player.damageMult;
+        const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
+        const dmg = baseDamage * stunMult;
+
+        const kind = (currentHeroId === 'defender' && player.shieldLevel > 0)
+          ? 'shield'
+          : 'bullet';
+
+        spawnProjectile(player.x, player.y, angle, 260, dmg, kind);
+        player.lastShot = nowShoot;
+        playBeep(620, 0.05, 0.12);
+      }
+    }
 
     // Background scroll – gentle diagonal drift
     bgScrollX += BG_SCROLL_SPEED * 0.4 * dt;
