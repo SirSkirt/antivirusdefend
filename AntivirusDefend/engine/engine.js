@@ -740,41 +740,6 @@
     gameState = 'upgrade';
   }
 
-  // Ransomware logic
-  function stealAbility(enemy){
-    const stealable = player.abilities.filter(a=>a!=='basicShot');
-    if(stealable.length===0) return;
-    const idx = Math.floor(Math.random()*stealable.length);
-    const ability = stealable[idx];
-    player.abilities = player.abilities.filter(a=>a!==ability);
-    enemy.stolenAbility = ability;
-    activeRansom = {
-      enemyId: enemy.id,
-      ability,
-      cost: 50
-    };
-    ransomText.textContent = `Ransomware stole your ${ability === 'orbit' ? 'Defender orbit' : ability}! Pay 50 chips? (65% chance of return)`;
-    ransomBar.style.display = 'flex';
-  }
-
-  btnPayRansom.addEventListener('click', ()=>{
-    if(!activeRansom) return;
-    if(chips.amount < activeRansom.cost) return;
-    chips.amount -= activeRansom.cost;
-    if(Math.random() < 0.65){
-      if(!player.abilities.includes(activeRansom.ability)){
-        player.abilities.push(activeRansom.ability);
-      }
-    }
-    activeRansom = null;
-    ransomBar.style.display = 'none';
-    updateTopUI();
-  });
-  btnIgnoreRansom.addEventListener('click', ()=>{
-    activeRansom = null;
-    ransomBar.style.display = 'none';
-  });
-
   // Projectiles
   function spawnProjectile(x,y,angle,speed,damage,fromEnemy=false,kind='bullet'){
     const r = (kind === 'defenderShield') ? 7 : 5;
