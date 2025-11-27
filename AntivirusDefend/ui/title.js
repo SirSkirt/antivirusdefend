@@ -1,5 +1,5 @@
 // title.js
-(function(){
+ function(){
   window.AVDEF = window.AVDEF || {};
   const Engine = AVDEF.Engine || {};
 
