@@ -5,34 +5,29 @@
   const canvas = document.getElementById('gameCanvas');
   const touchJoystickBase = document.getElementById('touchJoystickBase');
   const touchJoystickStick = document.getElementById('touchJoystickStick');
-    
-  // Match joystick size to the game canvas scale
-  const BASE_WORLD_WIDTH = 960;  // must match engine world.width
 
+  // Logical world size must match engine.js
+  const BASE_WORLD_WIDTH = 960;
+  const BASE_WORLD_HEIGHT = 540;
+
+  // Resize touch joystick so it feels right at different canvas scales
   function resizeTouchControls(){
-    if (!touchJoystickBase || !touchJoystickStick) return;
+    if(!touchJoystickBase || !touchJoystickStick || !canvas) return;
 
-    let referenceWidth = window.innerWidth;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width > 0) {
-        referenceWidth = rect.width;
-      }
-    }
+    const rect = canvas.getBoundingClientRect();
+    let referenceWidth = rect.width || window.innerWidth;
 
-    // Scale relative to the original world width
     const scale = referenceWidth / BASE_WORLD_WIDTH;
 
-    const baseSize  = 120 * scale; // outer circle
-    const stickSize = 72  * scale; // inner circle
+    const baseSize  = 120 * scale; // outer ring
+    const stickSize = 72  * scale; // inner knob
 
-    touchJoystickBase.style.width  = baseSize  + 'px';
-    touchJoystickBase.style.height = baseSize  + 'px';
+    touchJoystickBase.style.width  = baseSize + 'px';
+    touchJoystickBase.style.height = baseSize + 'px';
 
     touchJoystickStick.style.width  = stickSize + 'px';
     touchJoystickStick.style.height = stickSize + 'px';
   }
-
 
   // Keyboard state
   const keys = {
@@ -64,12 +59,15 @@
   let usingGamepad = false;
   let gamepadIndex = 0;
 
-  function screenToCanvas(x,y){
+  
+function screenToCanvas(x,y){
     if(!canvas) return { x:0, y:0 };
     const rect = canvas.getBoundingClientRect();
+    const rx = rect.width  || BASE_WORLD_WIDTH;
+    const ry = rect.height || BASE_WORLD_HEIGHT;
     return {
-      x: (x - rect.left) * (canvas.width/rect.width),
-      y: (y - rect.top) * (canvas.height/rect.height)
+      x: (x - rect.left) * (BASE_WORLD_WIDTH / rx),
+      y: (y - rect.top)  * (BASE_WORLD_HEIGHT / ry)
     };
   }
 
@@ -304,32 +302,16 @@
     canvas.addEventListener('touchend', onTouchEnd, { passive:false });
     canvas.addEventListener('touchcancel', onTouchEnd, { passive:false });
   }
-})();
 
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
-
-  if (canvas) {
-    canvas.addEventListener('mousemove', onMouseMove);
-    canvas.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mouseup', onMouseUp);
-
-    canvas.addEventListener('touchstart', onTouchStart, { passive:false });
-    canvas.addEventListener('touchmove', onTouchMove, { passive:false });
-    canvas.addEventListener('touchend', onTouchEnd, { passive:false });
-    canvas.addEventListener('touchcancel', onTouchEnd, { passive:false });
-  }
-
-  // Responsive joystick sizing
+  // Responsive joystick sizing based on canvas size
   function initResponsiveInput(){
     resizeTouchControls();
     window.addEventListener('resize', resizeTouchControls);
   }
 
-  if (document.readyState === 'loading') {
+  if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', initResponsiveInput);
-  } else {
+  }else{
     initResponsiveInput();
   }
 })();
-
