@@ -1,3 +1,5 @@
-// Title/menu UI module placeholder.
-// In the future, move pre-game menus and button wiring here.
+// Minimal placeholder title module.
+// All the actual menu wiring currently happens inside engine.js.
 
+window.AVDEF = window.AVDEF || {};
+AVDEF.Title = AVDEF.Title || {};
