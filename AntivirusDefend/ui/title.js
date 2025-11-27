@@ -58,6 +58,10 @@
       Engine.showTitle();
     }
   }
+  // Expose a small API so engine.js can request the title screen
+  AVDEF.Title = AVDEF.Title || {};
+  AVDEF.Title.showTitleScreen = showTitle;
+
 
   function showHeroSelect(){
     showOnly(heroSelectOverlay);
