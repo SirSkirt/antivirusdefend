@@ -1680,6 +1680,86 @@
     draw();
 
     requestAnimationFrame(loop);
+    
+    // --- Public engine API for title.js / menus ---
+
+  window.AVDEF = window.AVDEF || {};
+  AVDEF.Engine = AVDEF.Engine || {};
+
+  // Current options (volume + particles) for the Options menu
+  AVDEF.Engine.getOptions = function(){
+    return {
+      volume: typeof masterVolume === 'number' ? masterVolume : 0.5,
+      particles: !!enableParticles
+    };
+  };
+
+  AVDEF.Engine.setOptions = function(opts){
+    if(opts && typeof opts.volume === 'number'){
+      masterVolume = opts.volume;
+      if(masterGain){
+        masterGain.gain.value = masterVolume;
+      }
+    }
+    if(opts && typeof opts.particles === 'boolean'){
+      enableParticles = opts.particles;
+    }
+  };
+
+  // Hero selection
+  AVDEF.Engine.setHero = function(heroId){
+    selectedHeroId = heroId;
+    dlog('Engine.setHero(' + heroId + ')', 'info');
+  };
+
+  AVDEF.Engine.getHero = function(){
+    return selectedHeroId;
+  };
+
+  // Stage selection
+  AVDEF.Engine.setStage = function(stageId){
+    selectedStageId = stageId;
+    dlog('Engine.setStage(' + stageId + ')', 'info');
+  };
+
+  AVDEF.Engine.getStage = function(){
+    return selectedStageId;
+  };
+
+  // Start a new run using the currently selected hero + stage
+  AVDEF.Engine.startRun = function(){
+    const hero = (window.AVDEF && AVDEF.Heroes && AVDEF.Heroes.get)
+      ? AVDEF.Heroes.get(selectedHeroId)
+      : null;
+
+    if(!hero){
+      dlog('Engine.startRun: hero not found ' + selectedHeroId, 'error');
+      return;
+    }
+
+    currentHeroId = hero.id;
+    applyHeroStats(currentHeroId);
+
+    const stage = (window.AVDEF && AVDEF.Stages && AVDEF.Stages.get)
+      ? AVDEF.Stages.get(selectedStageId)
+      : null;
+
+    if(stage && stage.unlocked){
+      currentStageId = stage.id;
+    }
+
+    resetGame();
+    gameState = 'playing';
+    planWave();
+
+    dlog('Engine.startRun(): hero=' + currentHeroId + ', stage=' + currentStageId, 'info');
+  };
+
+  // Let title.js tell the engine "we're in the title state now"
+  AVDEF.Engine.showTitle = function(){
+    gameState = 'title';
+    dlog('Engine.showTitle()', 'info');
+  };
   }
 
   // Init
