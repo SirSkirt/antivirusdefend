@@ -1,254 +1,279 @@
+// input.js
+(function(){
+  window.AVDEF = window.AVDEF || {};
 
-// Antivirus Defend – input.js
-// Handles ALL low-level input (keyboard, mouse, touch joystick) and exposes a clean state
-// for the engine to read. No game logic lives here – just "what is the player trying to do?".
+  const canvas = document.getElementById('gameCanvas');
+  const touchJoystickBase = document.getElementById('touchJoystickBase');
+  const touchJoystickStick = document.getElementById('touchJoystickStick');
 
-(function(global){
-  "use strict";
-
-  const AVDEF = global.AVDEF = global.AVDEF || {};
-
-  // Public snapshot of current input intent
-  const state = {
-    // Movement intent (-1..1)
-    moveX: 0,
-    moveY: 0,
-
-    // Fire primary attack?
-    firePrimary: false,
-
-    // Has any pointer position we can aim at?
-    hasPointer: false,
-    pointerWorldX: 0,
-    pointerWorldY: 0,
-
-    // Internal: last raw pointer (screen) pos in case engine wants it
-    pointerScreenX: 0,
-    pointerScreenY: 0,
-
-    // Whether virtual joystick is currently active
-    usingJoystick: false,
+  // Keyboard state
+  const keys = {
+    ArrowUp:false,
+    ArrowDown:false,
+    ArrowLeft:false,
+    ArrowRight:false,
+    KeyW:false,
+    KeyA:false,
+    KeyS:false,
+    KeyD:false,
+    Space:false,
+    KeyP:false,
+    Escape:false
   };
 
-  // Callbacks into the engine – these are provided at init time.
-  let onPauseToggle = null;
-  let onHeroAbility = null;
-  let screenToWorld = null;
-  let canvas = null;
+  // Pointer + firing state
+  let pointerX = null;
+  let pointerY = null;
+  let mouseDown = false;
 
-  // Internal keyboard state (by lowercased key string: 'w','arrowup', etc.)
-  const keys = Object.create(null);
+  // Touch joystick state
+  let joystickActive = false;
+  let joystickTouchId = null;
+  let joystickCenter = { x:0, y:0 };
+  let joystickVec = { x:0, y:0 };
 
-  // Virtual joystick DOM and state
-  let joyWrap = null;
-  let joyKnob = null;
-  let joyActive = false;
-  const joyCenter = { x: 0, y: 0 };
-  const joyVector = { x: 0, y: 0 };
+  // Gamepad state
+  let usingGamepad = false;
+  let gamepadIndex = 0;
 
-  function init(options){
-    options = options || {};
-    canvas = options.canvas || global.document && document.getElementById("gameCanvas");
-    screenToWorld = options.screenToWorld || null;
-    onPauseToggle = typeof options.onPauseToggle === "function" ? options.onPauseToggle : null;
-    onHeroAbility = typeof options.onHeroAbility === "function" ? options.onHeroAbility : null;
-
-    if(!canvas){
-      console.warn("[Input] No canvas provided; input will be very limited.");
-    }
-
-    // Keyboard
-    global.addEventListener("keydown", handleKeyDown);
-    global.addEventListener("keyup", handleKeyUp);
-
-    // Mouse
-    if(canvas){
-      canvas.addEventListener("mousemove", handleMouseMove);
-      canvas.addEventListener("mousedown", handleMouseDown);
-      global.addEventListener("mouseup", handleMouseUp);
-    }
-
-    // Virtual joystick (for touch / gamepad-style movement)
-    joyWrap = document.getElementById("joystick") || null;
-    joyKnob = document.getElementById("joyKnob") || null;
-    if(joyWrap && joyKnob && global.PointerEvent){
-      joyWrap.addEventListener("pointerdown", joyPointerDown);
-      global.addEventListener("pointermove", joyPointerMove);
-      global.addEventListener("pointerup", joyPointerUp);
-      global.addEventListener("pointercancel", joyPointerUp);
-    }
-
-    console.log("[Input] input.js initialized");
-  }
-
-  // --- Keyboard handlers ---------------------------------------------------
-
-  function handleKeyDown(e){
-    const k = (e.key || "").toLowerCase();
-    keys[k] = true;
-
-    // Pause toggle – Escape or P
-    if(k === "escape" || k === "p"){
-      if(onPauseToggle){
-        e.preventDefault();
-        onPauseToggle();
-      }
-    }
-
-    // Hero special ability – Space
-    if(k === " " || k === "spacebar"){
-      if(onHeroAbility){
-        e.preventDefault();
-        onHeroAbility();
-      }
-    }
-
-    // Primary fire – keep simple: space or enter can also be mapped
-    if(k === " " || k === "spacebar" || k === "enter"){
-      state.firePrimary = true;
-    }
-  }
-
-  function handleKeyUp(e){
-    const k = (e.key || "").toLowerCase();
-    keys[k] = false;
-
-    if(k === " " || k === "spacebar" || k === "enter"){
-      state.firePrimary = false;
-    }
-  }
-
-  // --- Mouse handlers ------------------------------------------------------
-
-  function handleMouseMove(e){
-    state.pointerScreenX = e.clientX;
-    state.pointerScreenY = e.clientY;
-    if(typeof screenToWorld === "function"){
-      const w = screenToWorld(e.clientX, e.clientY);
-      state.pointerWorldX = w.x;
-      state.pointerWorldY = w.y;
-      state.hasPointer = true;
-    }
-  }
-
-  function handleMouseDown(e){
-    if(e.button === 0){
-      state.firePrimary = true;
-    }
-  }
-
-  function handleMouseUp(e){
-    if(e.button === 0){
-      state.firePrimary = false;
-    }
-  }
-
-  // --- Virtual joystick for touch -----------------------------------------
-
-  function joyPointerDown(e){
-    if(!joyWrap || !joyKnob) return;
-    e.preventDefault();
-    joyActive = true;
-    const rect = joyWrap.getBoundingClientRect();
-    joyCenter.x = rect.left + rect.width / 2;
-    joyCenter.y = rect.top + rect.height / 2;
-    updateJoy(e);
-  }
-
-  function joyPointerMove(e){
-    if(!joyActive) return;
-    e.preventDefault();
-    updateJoy(e);
-  }
-
-  function joyPointerUp(e){
-    if(!joyActive) return;
-    e.preventDefault();
-    joyActive = false;
-    joyVector.x = 0;
-    joyVector.y = 0;
-    state.usingJoystick = false;
-    joyKnob.style.transform = "translate(-50%,-50%)";
-  }
-
-  function getPointFromEvent(e){
-    if(e.touches && e.touches.length > 0){
-      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-    if(e.changedTouches && e.changedTouches.length > 0){
-      return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
-    }
-    return { x: e.clientX, y: e.clientY };
-  }
-
-  function updateJoy(e){
-    const pt = getPointFromEvent(e);
-    const dx = pt.x - joyCenter.x;
-    const dy = pt.y - joyCenter.y;
-    const maxR = 50;
-    const dist = Math.hypot(dx, dy) || 1;
-    let ux = dx;
-    let uy = dy;
-    if(dist > maxR){
-      ux = dx / dist * maxR;
-      uy = dy / dist * maxR;
-    }
-    joyVector.x = (dist > 8) ? ux / maxR : 0;
-    joyVector.y = (dist > 8) ? uy / maxR : 0;
-    state.usingJoystick = Math.abs(joyVector.x) > 0.01 || Math.abs(joyVector.y) > 0.01;
-
-    joyKnob.style.transform =
-      "translate(calc(-50% + " + ux + "px), calc(-50% + " + uy + "px))";
-  }
-
-  // --- Public API ----------------------------------------------------------
-
-  function computeState(){
-    // Reset intent
-    let mx = 0;
-    let my = 0;
-
-    // Virtual joystick wins if active
-    if(state.usingJoystick){
-      mx = joyVector.x;
-      my = joyVector.y;
-    }else{
-      if(keys["w"] || keys["arrowup"]) my -= 1;
-      if(keys["s"] || keys["arrowdown"]) my += 1;
-      if(keys["a"] || keys["arrowleft"]) mx -= 1;
-      if(keys["d"] || keys["arrowright"]) mx += 1;
-    }
-
-    const len = Math.hypot(mx, my);
-    if(len > 0.0001){
-      state.moveX = mx / len;
-      state.moveY = my / len;
-    }else{
-      state.moveX = 0;
-      state.moveY = 0;
-    }
-  }
-
-  function getState(){
-    // Recompute each time engine asks, so keys / joystick are up to date
-    computeState();
-    // Return a shallow copy so engine doesn't accidentally mutate internal state
+  function screenToCanvas(x,y){
+    if(!canvas) return { x:0, y:0 };
+    const rect = canvas.getBoundingClientRect();
     return {
-      moveX: state.moveX,
-      moveY: state.moveY,
-      firePrimary: state.firePrimary,
-      hasPointer: state.hasPointer,
-      pointerWorldX: state.pointerWorldX,
-      pointerWorldY: state.pointerWorldY,
-      pointerScreenX: state.pointerScreenX,
-      pointerScreenY: state.pointerScreenY,
-      usingJoystick: state.usingJoystick,
+      x: (x - rect.left) * (canvas.width/rect.width),
+      y: (y - rect.top) * (canvas.height/rect.height)
     };
   }
 
+  // --- Keyboard handlers ---
+
+  function onKeyDown(e){
+    if(e.repeat) return;
+    if(e.code in keys){
+      keys[e.code] = true;
+    }
+  }
+
+  function onKeyUp(e){
+    if(e.code in keys){
+      keys[e.code] = false;
+    }
+  }
+
+  // --- Mouse handlers ---
+
+  function onMouseMove(e){
+    if(!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    pointerX = (e.clientX - rect.left) * (canvas.width/rect.width);
+    pointerY = (e.clientY - rect.top) * (canvas.height/rect.height);
+  }
+
+  function onMouseDown(e){
+    if(e.button === 0){
+      mouseDown = true;
+    }
+  }
+
+  function onMouseUp(e){
+    if(e.button === 0){
+      mouseDown = false;
+    }
+  }
+
+  // --- Touch handlers ---
+
+  function onTouchStart(e){
+    if(!canvas) return;
+    e.preventDefault();
+    for(const touch of e.changedTouches){
+      const pos = screenToCanvas(touch.clientX,touch.clientY);
+      // Left side = movement joystick
+      if(pos.x < canvas.width*0.4){
+        if(!joystickActive && touchJoystickBase && touchJoystickStick){
+          joystickActive = true;
+          joystickTouchId = touch.identifier;
+          joystickCenter = { x:pos.x, y:pos.y };
+          joystickVec = { x:0, y:0 };
+          touchJoystickBase.style.left = `${pos.x-40}px`;
+          touchJoystickBase.style.top = `${pos.y-40}px`;
+          touchJoystickBase.classList.add('visible');
+          touchJoystickStick.style.left = `${pos.x-20}px`;
+          touchJoystickStick.style.top = `${pos.y-20}px`;
+        }
+      }else{
+        // Right side = firing
+        mouseDown = true;
+        pointerX = pos.x;
+        pointerY = pos.y;
+      }
+    }
+  }
+
+  function onTouchMove(e){
+    if(!canvas) return;
+    e.preventDefault();
+    for(const touch of e.changedTouches){
+      const pos = screenToCanvas(touch.clientX,touch.clientY);
+      if(joystickActive && touch.identifier === joystickTouchId && touchJoystickBase && touchJoystickStick){
+        const dx = pos.x - joystickCenter.x;
+        const dy = pos.y - joystickCenter.y;
+        const dist = Math.hypot(dx,dy);
+        const maxDist = 36;
+        let vx = dx;
+        let vy = dy;
+        if(dist > maxDist){
+          const k = maxDist/(dist||1);
+          vx *= k;
+          vy *= k;
+        }
+        touchJoystickStick.style.left = `${joystickCenter.x + vx - 20}px`;
+        touchJoystickStick.style.top = `${joystickCenter.y + vy - 20}px`;
+        joystickVec = {
+          x: dx/(dist||1),
+          y: dy/(dist||1)
+        };
+      }else{
+        // Touch on right side: update pointer (for aiming feel)
+        pointerX = pos.x;
+        pointerY = pos.y;
+      }
+    }
+  }
+
+  function onTouchEnd(e){
+    if(!canvas) return;
+    e.preventDefault();
+    for(const touch of e.changedTouches){
+      const pos = screenToCanvas(touch.clientX,touch.clientY);
+      if(joystickActive && touch.identifier === joystickTouchId && touchJoystickBase && touchJoystickStick){
+        joystickActive = false;
+        joystickTouchId = null;
+        joystickVec = { x:0, y:0 };
+        touchJoystickBase.classList.remove('visible');
+      }else{
+        // End firing touch
+        mouseDown = false;
+      }
+    }
+  }
+
+  // --- Gamepad helpers ---
+
+  window.addEventListener('gamepadconnected', (e)=>{
+    gamepadIndex = e.gamepad.index;
+    usingGamepad = true;
+  });
+
+  function sampleGamepad(){
+    const result = {
+      moveX: 0,
+      moveY: 0,
+      aimX: 0,
+      aimY: 0,
+      firing: false,
+      pause: false,
+      ability: false
+    };
+
+    if(!navigator.getGamepads) return result;
+    const pads = navigator.getGamepads();
+    const gp = pads[gamepadIndex];
+    if(!gp) return result;
+
+    const dead = 0.2;
+    const ax = gp.axes[0] || 0;
+    const ay = gp.axes[1] || 0;
+    if(Math.abs(ax) > dead || Math.abs(ay) > dead){
+      result.moveX = ax;
+      result.moveY = ay;
+    }
+
+    const dead2 = 0.25;
+    const ax2 = gp.axes[2] || 0;
+    const ay2 = gp.axes[3] || 0;
+    if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
+      result.aimX = ax2;
+      result.aimY = ay2;
+    }
+
+    // Right trigger = fire
+    if(gp.buttons[7] && gp.buttons[7].pressed){
+      result.firing = true;
+    }
+    // Start = pause
+    if(gp.buttons[9] && gp.buttons[9].pressed){
+      result.pause = true;
+    }
+    // A = ability
+    if(gp.buttons[0] && gp.buttons[0].pressed){
+      result.ability = true;
+    }
+
+    return result;
+  }
+
+  // --- Public input state API ---
+
   AVDEF.Input = {
-    init,
-    getState,
+    getState(){
+      // Keyboard movement
+      let mx = 0;
+      let my = 0;
+      if(keys.KeyW || keys.ArrowUp) my -= 1;
+      if(keys.KeyS || keys.ArrowDown) my += 1;
+      if(keys.KeyA || keys.ArrowLeft) mx -= 1;
+      if(keys.KeyD || keys.ArrowRight) mx += 1;
+
+      // Touch joystick movement
+      if(joystickActive){
+        mx += joystickVec.x;
+        my += joystickVec.y;
+      }
+
+      // Gamepad
+      const gp = sampleGamepad();
+      mx += gp.moveX;
+      my += gp.moveY;
+
+      // Normalise if needed (engine also normalises, but this keeps it tidy)
+      const len = Math.hypot(mx,my);
+      if(len > 1){
+        mx /= len;
+        my /= len;
+      }
+
+      const firing = mouseDown || gp.firing;
+      const pausePressed = keys.KeyP || keys.Escape || gp.pause;
+      const abilityPressed = keys.Space || gp.ability;
+
+      return {
+        moveX: mx,
+        moveY: my,
+        pointerX,
+        pointerY,
+        firing,
+        pausePressed,
+        abilityPressed,
+        aimStickX: gp.aimX,
+        aimStickY: gp.aimY
+      };
+    }
   };
 
-})(window);
+  // --- Attach listeners ---
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+
+  if(canvas){
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mouseup', onMouseUp);
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive:false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive:false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive:false });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive:false });
+  }
+})();
