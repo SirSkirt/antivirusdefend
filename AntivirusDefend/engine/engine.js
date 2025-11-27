@@ -1062,7 +1062,359 @@
   }
 
   // --- Drawing ---
+function drawBackgroundCase(){
+  const grad = ctx.createLinearGradient(0,0,0,canvas.height);
+  grad.addColorStop(0,'#020617');
+  grad.addColorStop(1,'#0b1120');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
+  ctx.save();
+  ctx.strokeStyle = 'rgba(148,163,184,0.18)';
+  ctx.lineWidth = 2;
+  const pad = 40;
+  ctx.beginPath();
+  ctx.moveTo(pad,pad);
+  ctx.lineTo(canvas.width-pad,pad);
+  ctx.lineTo(canvas.width-pad,canvas.height-pad);
+  ctx.lineTo(pad,canvas.height-pad);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(56,189,248,0.18)';
+  ctx.lineWidth = 1;
+  const cols = 6;
+  const rows = 3;
+  const pad2 = 40;
+  for(let i=1;i<cols;i++){
+    const x = pad2 + (canvas.width-2*pad2)*(i/cols);
+    ctx.beginPath();
+    ctx.moveTo(x,pad2);
+    ctx.lineTo(x,canvas.height-pad2);
+    ctx.stroke();
+  }
+  for(let j=1;j<rows;j++){
+    const y = pad2 + (canvas.height-2*pad2)*(j/rows);
+    ctx.beginPath();
+    ctx.moveTo(pad2,y);
+    ctx.lineTo(canvas.width-pad2,y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(15,23,42,0.9)';
+  ctx.fillRect(0,canvas.height-60,canvas.width,60);
+  ctx.restore();
+}
+
+function drawXPOrbs(){
+  ctx.save();
+  ctx.fillStyle = '#22c55e';
+  for(const orb of xpOrbs){
+    ctx.beginPath();
+    ctx.arc(orb.x,orb.y,orb.radius,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawParticles(){
+  ctx.save();
+  for(const p of particles){
+    const t = p.life/p.maxLife;
+    if(t<=0) continue;
+    ctx.globalAlpha = t;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,4,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawEnemies(){
+  ctx.save();
+  for(const e of enemies){
+    ctx.save();
+    ctx.translate(e.x,e.y);
+    const slowActive = gameTime < e.slowUntil;
+    const confusedActive = gameTime < e.confusedUntil;
+    const radius = e.radius;
+
+    ctx.beginPath();
+    ctx.fillStyle = '#0f172a';
+    ctx.arc(0,0,radius+6,0,Math.PI*2);
+    ctx.fill();
+
+    const hpFrac = e.hp/e.maxHp;
+    ctx.beginPath();
+    ctx.strokeStyle = '#f97373';
+    ctx.lineWidth = 3;
+    ctx.arc(0,0,radius+4, -Math.PI/2, -Math.PI/2 + hpFrac*Math.PI*2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.fillStyle = slowActive ? '#22c55e' : (confusedActive ? '#fbbf24' : '#e5e7eb');
+    ctx.arc(0,0,radius,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.arc(-radius/3,-radius/3,3,0,Math.PI*2);
+    ctx.arc(radius/3,-radius/3,3,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.fillStyle = e.disguised ? '#fb7185' : '#22d3ee';
+    ctx.arc(0,radius/3,4,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawHeroBody(){
+  const hero = AVDEF.Heroes.get(currentHeroId) || {};
+  ctx.save();
+  ctx.translate(player.x,player.y);
+  ctx.rotate(player.facingAngle);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = '#0f172a';
+  ctx.arc(0,0,player.radius+6,0,Math.PI*2);
+  ctx.fill();
+
+  const hpFrac = player.hp/player.maxHp;
+  ctx.beginPath();
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 4;
+  ctx.arc(0,0,player.radius+4,-Math.PI/2,-Math.PI/2+hpFrac*Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  const grad = ctx.createLinearGradient(-player.radius,0,player.radius,0);
+  grad.addColorStop(0,'#38bdf8');
+  grad.addColorStop(1,'#22c55e');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(0,0,player.radius*1.2,player.radius,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  if(heroImages[currentHeroId]){
+    ctx.save();
+    ctx.rotate(-player.facingAngle);
+    const img = heroImages[currentHeroId];
+    const size = player.radius*1.2;
+    ctx.globalAlpha = 0.95;
+    ctx.drawImage(img,-size*0.7,-size*0.7,size*1.4,size*1.4);
+    ctx.restore();
+  }else{
+    ctx.save();
+    ctx.rotate(-player.facingAngle);
+    ctx.fillStyle = '#0b1120';
+    ctx.beginPath();
+    ctx.arc(0,0,player.radius*0.65,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = `bold ${player.radius*0.9}px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(hero.initial || '?',0,1);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(56,189,248,0.55)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(player.radius*0.7,0);
+  ctx.lineTo(player.radius*1.8,0);
+  ctx.stroke();
+  ctx.restore();
+
+  if(gameTime < player.nortonShieldActiveUntil){
+    const t = (player.nortonShieldActiveUntil - gameTime)/3;
+    const blink = 0.6 + 0.4*Math.sin(gameTime*10);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0,Math.min(1,t))*blink;
+    const grad2 = ctx.createRadialGradient(0,0,player.radius*0.6,0,0,player.radius*1.7);
+    grad2.addColorStop(0,'rgba(251,191,36,0.1)');
+    grad2.addColorStop(1,'rgba(251,191,36,0.5)');
+    ctx.fillStyle = grad2;
+    ctx.beginPath();
+    ctx.arc(0,0,player.radius*1.7,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if(scanConeEnabled){
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    const width = Math.PI/6;
+    const start = -width/2;
+    const end = width/2;
+    const r = player.radius*5;
+    const grad = ctx.createRadialGradient(0,0,player.radius*0.4,0,0,r);
+    grad.addColorStop(0,'rgba(56,189,248,0.0)');
+    grad.addColorStop(0.5,'rgba(56,189,248,0.37)');
+    grad.addColorStop(1,'rgba(56,189,248,0.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r,start,end);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if(player.orbitLevel>0 && player.orbitProjectiles.length>0){
+    ctx.save();
+    ctx.rotate(-player.facingAngle);
+    for(const orb of player.orbitProjectiles){
+      const ox = Math.cos(orb.angle)*orb.radius;
+      const oy = Math.sin(orb.angle)*orb.radius;
+      ctx.beginPath();
+      ctx.fillStyle = '#38bdf8';
+      ctx.arc(ox,oy,6,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(56,189,248,0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.arc(ox,oy,10,0,Math.PI*2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if(gameTime < player.phaseShiftingUntil){
+    const t = (player.phaseShiftingUntil - gameTime)/player.phaseShiftDuration;
+    ctx.save();
+    ctx.globalAlpha = 0.3+0.4*t;
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.arc(0,0,player.radius*1.5,0,Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawHero(){
+  drawHeroBody();
+}
+
+function drawProjectiles(){
+  ctx.save();
+  for(const p of projectiles){
+    ctx.beginPath();
+    if(p.kind === 'shield' || p.kind === 'shield-toss'){
+      const grad = ctx.createLinearGradient(p.x-10,p.y-10,p.x+10,p.y+10);
+      grad.addColorStop(0,'#60a5fa');
+      grad.addColorStop(1,'#22d3ee');
+      ctx.fillStyle = grad;
+      ctx.arc(p.x,p.y,p.radius+2,0,Math.PI*2);
+    }else{
+      ctx.fillStyle = '#38bdf8';
+      ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBeams(){
+  ctx.save();
+  for(const b of beams){
+    const t = b.life/b.maxLife;
+    ctx.globalAlpha = t;
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(b.x1,b.y1);
+    ctx.lineTo(b.x2,b.y2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(b.x1,b.y1);
+    ctx.lineTo(b.x2,b.y2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAOEPulses(){
+  ctx.save();
+  for(const a of aoePulses){
+    const t = a.life/a.maxLife;
+    ctx.globalAlpha = t*0.7;
+    const grad = ctx.createRadialGradient(a.x,a.y,a.radius*0.2,a.x,a.y,a.radius);
+    grad.addColorStop(0,'rgba(249,115,22,0.0)');
+    grad.addColorStop(0.4,'rgba(249,115,22,0.5)');
+    grad.addColorStop(1,'rgba(248,250,252,0.0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(a.x,a.y,a.radius,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHUD(){
+  const barWidth = 220;
+  const barHeight = 12;
+  const margin = 16;
+  const startX = margin;
+  const startY = canvas.height-50;
+
+  ctx.save();
+  ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.fillStyle = '#e5e7eb';
+  ctx.textBaseline = 'top';
+
+  ctx.fillText(`Wave ${currentWave}`, startX, startY-18);
+  ctx.fillText(`LVL ${player.level}`, startX+barWidth+40, startY-18);
+  ctx.fillText(`Chips ${chips.count}`, startX+barWidth+40, startY+barHeight+4);
+
+  ctx.fillStyle = 'rgba(15,23,42,0.9)';
+  ctx.fillRect(startX-6,startY-6,barWidth+12,barHeight+12);
+  ctx.fillRect(startX-6,startY+barHeight+8,barWidth+12,barHeight+12);
+
+  ctx.fillStyle = '#020617';
+  ctx.fillRect(startX-4,startY-4,barWidth+8,barHeight+8);
+  ctx.fillRect(startX-4,startY+barHeight+10,barWidth+8,barHeight+8);
+
+  const hpFrac = player.hp/player.maxHp;
+  ctx.fillStyle = '#f97373';
+  ctx.fillRect(startX-2,startY-2,(barWidth+4)*hpFrac,barHeight+4);
+  ctx.fillStyle = 'rgba(15,23,42,0.8)';
+  ctx.fillRect(startX-2,startY-2,barWidth+4,barHeight+4);
+
+  const xpFrac = player.xp/player.xpToNext;
+  ctx.fillStyle = '#22c55e';
+  ctx.fillRect(startX-2,startY+barHeight+12,(barWidth+4)*xpFrac,barHeight+4);
+  ctx.fillStyle = 'rgba(15,23,42,0.8)';
+  ctx.fillRect(startX-2,startY+barHeight+12,barWidth+4,barHeight+4);
+
+  ctx.fillStyle = '#f97373';
+  ctx.fillText(`${player.hp}/${player.maxHp}`, startX+6, startY-2);
+  ctx.fillStyle = '#22c55e';
+  ctx.fillText(`${player.xp}/${player.xpToNext}`, startX+6, startY+barHeight+10);
+
+  ctx.restore();
+      }
+  
   function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     drawBackgroundCase();
