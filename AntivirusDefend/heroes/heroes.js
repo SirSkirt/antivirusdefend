@@ -16,7 +16,7 @@ AVDEF.Heroes = (function() {
       fireDelay:0.7,
       initial:'WD',
       color:'#1d4ed8',
-      logoUrl:"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Windows-defender.svg/240px-Windows-defender.svg.png"
+            logoUrl:(window.AVDEF && AVDEF.Textures && AVDEF.Textures.heroLogos['defender']) || "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Windows-defender.svg/240px-Windows-defender.svg.png"
     },
     avg:{
       id:'avg',
@@ -28,7 +28,7 @@ AVDEF.Heroes = (function() {
       fireDelay:0.8,
       initial:'A',
       color:'#f97316',
-      logoUrl:"https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/AVG_Similar_Icon.svg/960px-AVG_Similar_Icon.svg.png?20200830015222"
+            logoUrl:(window.AVDEF && AVDEF.Textures && AVDEF.Textures.heroLogos['avg']) || "https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/AVG_Similar_Icon.svg/960px-AVG_Similar_Icon.svg.png?20200830015222"
     },
     avast:{
       id:'avast',
@@ -40,7 +40,7 @@ AVDEF.Heroes = (function() {
       fireDelay:0.65,
       initial:'AV',
       color:'#f97316',
-      logoUrl:"https://upload.wikimedia.org/wikipedia/commons/4/4e/Avast_Software_white_logo.png?20190728134047"
+            logoUrl:(window.AVDEF && AVDEF.Textures && AVDEF.Textures.heroLogos['avast']) || "https://upload.wikimedia.org/wikipedia/commons/4/4e/Avast_Software_white_logo.png?20190728134047"
     },
     norton:{
       id:'norton',
@@ -52,7 +52,7 @@ AVDEF.Heroes = (function() {
       fireDelay:0.85,
       initial:'N',
       color:'#facc15',
-      logoUrl:"https://cdn.brandfetch.io/idooDSluCu/theme/light/symbol.svg?c=1dxbfHSJFAPEGdCLU4o5B"
+            logoUrl:(window.AVDEF && AVDEF.Textures && AVDEF.Textures.heroLogos['norton']) || "https://cdn.brandfetch.io/idooDSluCu/theme/light/symbol.svg?c=1dxbfHSJFAPEGdCLU4o5B"
     },
     mcafee:{
       id:'mcafee',
@@ -64,7 +64,7 @@ AVDEF.Heroes = (function() {
       fireDelay:0.7,
       initial:'M',
       color:'#b91c1c',
-      logoUrl:"https://companieslogo.com/img/orig/MCFE-d6ec69dd.png?t=1720244492"
+            logoUrl:(window.AVDEF && AVDEF.Textures && AVDEF.Textures.heroLogos['mcafee']) || "https://companieslogo.com/img/orig/MCFE-d6ec69dd.png?t=1720244492"
     },
     q360:{
       id:'q360',
@@ -76,7 +76,7 @@ AVDEF.Heroes = (function() {
       fireDelay:0.6,
       initial:'360',
       color:'#16a34a',
-      logoUrl:"https://packagestore.com/wp-content/uploads/2023/07/0D56757242667073F5E9610001F2E43A.png"
+            logoUrl:(window.AVDEF && AVDEF.Textures && AVDEF.Textures.heroLogos['q360']) || "https://packagestore.com/wp-content/uploads/2023/07/0D56757242667073F5E9610001F2E43A.png"
     }
   };
 

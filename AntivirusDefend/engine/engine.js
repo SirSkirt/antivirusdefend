@@ -1686,6 +1686,7 @@ function drawHeroBody(){
   }
 
   
+
 function drawProjectiles(){
     ctx.save();
     for(const p of projectiles){
@@ -1712,31 +1713,18 @@ function drawProjectiles(){
       const x1 = p.x - nx * tailLen;
       const y1 = p.y - ny * tailLen;
 
-      // Color palette per hero
+      // Color palette per hero comes from AVDEF.Textures
       let inner = '#e0f2fe';
       let mid   = '#38bdf8';
       let outer = '#0ea5e9';
 
-      if(currentHeroId === 'avg'){
-        inner = '#fefce8';
-        mid   = '#facc15';
-        outer = '#ca8a04';
-      }else if(currentHeroId === 'avast'){
-        inner = '#ffedd5';
-        mid   = '#fb923c';
-        outer = '#ea580c';
-      }else if(currentHeroId === 'norton'){
-        inner = '#fefce8';
-        mid   = '#fde047';
-        outer = '#facc15';
-      }else if(currentHeroId === 'q360' || currentHeroId === 'total'){
-        inner = '#dcfce7';
-        mid   = '#4ade80';
-        outer = '#16a34a';
-      }else if(currentHeroId === 'mcafee'){
-        inner = '#fee2e2';
-        mid   = '#f97373';
-        outer = '#e11d48';
+      if(window.AVDEF && AVDEF.Textures && AVDEF.Textures.projectilePalettes){
+        const palettes = AVDEF.Textures.projectilePalettes;
+        const base = palettes.default || { inner, mid, outer };
+        const heroPalette = palettes[currentHeroId] || base;
+        inner = heroPalette.inner || inner;
+        mid   = heroPalette.mid   || mid;
+        outer = heroPalette.outer || outer;
       }
 
       // Draw tail
@@ -1763,6 +1751,7 @@ function drawProjectiles(){
     }
     ctx.restore();
   }
+
 
 
   function drawBeams(){
@@ -1908,31 +1897,31 @@ function drawProjectiles(){
 
   ctx.restore();
 }
-
 function draw(){
     if (!canvas || !ctx) return;
 
-    // Clear the raw canvas
+    // Clear in raw canvas pixels
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Scale world space (960x540) into the current canvas resolution
+    // Scale world space (960x540) to current canvas resolution
     ctx.setTransform(renderScale,0,0,renderScale,0,0);
 
-    // Camera: keep the player near the center when in-game so the world scrolls
-    let camX = world.width * 0.5;
-    let camY = world.height * 0.5;
-
+    // Camera follows the player so the world scrolls underneath.
     if (gameState === 'playing' || gameState === 'upgrading' || gameState === 'paused' || gameState === 'gameover') {
-      camX = player.x;
-      camY = player.y;
+      cameraX = player.x;
+      cameraY = player.y;
+    } else {
+      // In menus / title keep camera centered on origin area.
+      cameraX = world.width * 0.5;
+      cameraY = world.height * 0.5;
     }
 
     // --- World layer (moves with camera) ---
     ctx.save();
-    ctx.translate(world.width * 0.5 - camX, world.height * 0.5 - camY);
+    ctx.translate(world.width * 0.5 - cameraX, world.height * 0.5 - cameraY);
 
-    // Inside-the-case world
+    // Interior of the case and everything that exists "inside" the computer
     drawBackgroundCase();
     drawXPOrbs();
     drawParticles();
@@ -1944,13 +1933,13 @@ function draw(){
 
     ctx.restore();
 
-    // --- HUD / UI layer (fixed on screen) ---
+    // --- UI layer (fixed to screen) ---
     ctx.save();
     ctx.setTransform(renderScale,0,0,renderScale,0,0);
+    drawCaseFrame();
     drawHUD();
     ctx.restore();
   }
-
 
 
 
