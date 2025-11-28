@@ -1908,31 +1908,31 @@ function drawProjectiles(){
 
   ctx.restore();
 }
+
 function draw(){
     if (!canvas || !ctx) return;
 
-    // Clear in raw canvas pixels
+    // Clear the raw canvas
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // Scale world space (960x540) to current canvas resolution
+    // Scale world space (960x540) into the current canvas resolution
     ctx.setTransform(renderScale,0,0,renderScale,0,0);
 
-    // Camera follows the player so the world scrolls underneath.
+    // Camera: keep the player near the center when in-game so the world scrolls
+    let camX = world.width * 0.5;
+    let camY = world.height * 0.5;
+
     if (gameState === 'playing' || gameState === 'upgrading' || gameState === 'paused' || gameState === 'gameover') {
-      cameraX = player.x;
-      cameraY = player.y;
-    } else {
-      // In menus / title keep camera centered on origin area.
-      cameraX = world.width * 0.5;
-      cameraY = world.height * 0.5;
+      camX = player.x;
+      camY = player.y;
     }
 
     // --- World layer (moves with camera) ---
     ctx.save();
-    ctx.translate(world.width * 0.5 - cameraX, world.height * 0.5 - cameraY);
+    ctx.translate(world.width * 0.5 - camX, world.height * 0.5 - camY);
 
-    // Interior of the case and everything that exists "inside" the computer
+    // Inside-the-case world
     drawBackgroundCase();
     drawXPOrbs();
     drawParticles();
@@ -1944,13 +1944,13 @@ function draw(){
 
     ctx.restore();
 
-    // --- UI layer (fixed to screen) ---
+    // --- HUD / UI layer (fixed on screen) ---
     ctx.save();
     ctx.setTransform(renderScale,0,0,renderScale,0,0);
-    drawCaseFrame();
     drawHUD();
     ctx.restore();
   }
+
 
 
 
