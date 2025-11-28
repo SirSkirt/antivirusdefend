@@ -51,6 +51,14 @@
     width: 960,
     height: 540
   }
+  // Background scrolling state
+  // let bgScrollX (unused after case redesign) = 0;
+  // let bgScrollY (unused after case redesign) = 0;
+  // const BG_TILE (unused after case redesign) = 64;
+  // const BG_SCROLL_SPEED (unused after case redesign) = 18; // pixels per second
+;
+
+
   // Logical world size is fixed; canvas pixels scale to fit viewport
   const BASE_WORLD_WIDTH = world.width;
   const BASE_WORLD_HEIGHT = world.height;
@@ -447,22 +455,12 @@
   }
 
   function spawnEnemy(type){
-    const margin = 40;
-    const edge = Math.floor(Math.random()*4);
-    let x,y;
-    if(edge===0){
-      x = Math.random()*world.width;
-      y = -margin;
-    }else if(edge===1){
-      x = Math.random()*world.width;
-      y = world.height+margin;
-    }else if(edge===2){
-      x = -margin;
-      y = Math.random()*world.height;
-    }else{
-      x = world.width+margin;
-      y = Math.random()*world.height;
-    }
+    // Spawn enemies in a ring around the player so the world feels infinite.
+    const baseRadius = Math.max(world.width, world.height) * 0.75;
+    const spawnRadius = baseRadius + 80;
+    const angle = Math.random() * Math.PI * 2;
+    let x = player.x + Math.cos(angle) * spawnRadius;
+    let y = player.y + Math.sin(angle) * spawnRadius;
 
     const stats = AVDEF.Enemies.getStats(type, currentWave);
 
@@ -643,10 +641,7 @@
       const effSpeed = player.speed * (gameTime < player.stunnedUntil ? 0.4 : 1);
       player.x += mx*effSpeed*dt;
       player.y += my*effSpeed*dt;
-      if(player.x < player.radius) player.x = player.radius;
-      if(player.x > world.width-player.radius) player.x = world.width-player.radius;
-      if(player.y < player.radius) player.y = player.radius;
-      if(player.y > world.height-player.radius) player.y = world.height-player.radius;
+
     }
 
     // Aiming (mouse / touch pointer / gamepad right stick)
@@ -811,6 +806,7 @@
       }
     }
 
+
     if(!waveInProgress){
       currentWave++;
       if(currentWave === 1){
@@ -855,10 +851,6 @@
       if(slowActive) speed *= (player.slowFactor || 0.6);
       e.x += dx*speed*dt;
       e.y += dy*speed*dt;
-      if(e.x < e.radius) e.x = e.radius;
-      if(e.x > world.width-e.radius) e.x = world.width-e.radius;
-      if(e.y < e.radius) e.y = e.radius;
-      if(e.y > world.height-e.radius) e.y = world.height-e.radius;
 
       const distToPlayer = Math.hypot(e.x-player.x,e.y-player.y);
       if(distToPlayer < e.radius+player.radius){
@@ -912,7 +904,13 @@
         projectiles.splice(i,1);
         continue;
       }
-      if(p.x< -40 || p.x>world.width+40 || p.y<-40 || p.y>world.height+40){
+      // Cull projectiles based on distance from the player, not fixed world edges,
+      // so the world can feel infinite while keeping performance sane.
+      const offX = p.x - player.x;
+      const offY = p.y - player.y;
+      const marginX = world.width * 0.9;
+      const marginY = world.height * 0.9;
+      if(offX < -marginX || offX > marginX || offY < -marginY || offY > marginY){
         projectiles.splice(i,1);
         continue;
       }
@@ -1086,102 +1084,271 @@
     ctx.restore();
   }
 
-  function drawBackgroundCase(){
-    ctx.save();
+  
+function drawBackgroundCase(){
+  const w = world.width;
+  const h = world.height;
 
-    // Base dark
-    ctx.fillStyle = '#020617';
-    ctx.fillRect(0,0,world.width,world.height);
+  // Dark base that everything sits on
+  const baseGrad = ctx.createLinearGradient(0, 0, 0, h);
+  baseGrad.addColorStop(0, '#020617');
+  baseGrad.addColorStop(0.4, '#02081a');
+  baseGrad.addColorStop(1, '#000814');
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, w, h);
 
-    const margin = 40;
-    const caseX = margin;
-    const caseY = margin;
-    const caseW = world.width - margin*2;
-    const caseH = world.height - margin*2;
+  // Inner motherboard slab (no grids, just a big PCB plate)
+  const pad = 42;
+  const innerX = pad;
+  const innerY = pad + 8;
+  const innerW = w - pad*2;
+  const innerH = h - pad*2 - 16;
 
-    // Case body
-    let g = ctx.createLinearGradient(caseX,caseY,caseX+caseW,caseY+caseH);
-    g.addColorStop(0,'#020617');
-    g.addColorStop(0.4,'#020617');
-    g.addColorStop(1,'#030712');
-    ctx.fillStyle = g;
+  ctx.save();
+  ctx.beginPath();
+  const r = 18;
+  ctx.moveTo(innerX + r, innerY);
+  ctx.lineTo(innerX + innerW - r, innerY);
+  ctx.quadraticCurveTo(innerX + innerW, innerY, innerX + innerW, innerY + r);
+  ctx.lineTo(innerX + innerW, innerY + innerH - r);
+  ctx.quadraticCurveTo(innerX + innerW, innerY + innerH, innerX + innerW - r, innerY + innerH);
+  ctx.lineTo(innerX + r, innerY + innerH);
+  ctx.quadraticCurveTo(innerX, innerY + innerH, innerX, innerY + innerH - r);
+  ctx.lineTo(innerX, innerY + r);
+  ctx.quadraticCurveTo(innerX, innerY, innerX + r, innerY);
+  ctx.closePath();
 
-    const radius = 20;
-    ctx.beginPath();
-    ctx.moveTo(caseX+radius, caseY);
-    ctx.lineTo(caseX+caseW-radius, caseY);
-    ctx.quadraticCurveTo(caseX+caseW, caseY, caseX+caseW, caseY+radius);
-    ctx.lineTo(caseX+caseW, caseY+caseH-radius);
-    ctx.quadraticCurveTo(caseX+caseW, caseY+caseH, caseX+caseW-radius, caseY+caseH);
-    ctx.lineTo(caseX+radius, caseY+caseH);
-    ctx.quadraticCurveTo(caseX, caseY+caseH, caseX, caseY+caseH-radius);
-    ctx.lineTo(caseX, caseY+radius);
-    ctx.quadraticCurveTo(caseX, caseY, caseX+radius, caseY);
-    ctx.closePath();
-    ctx.fill();
+  const pcbGrad = ctx.createLinearGradient(innerX, innerY, innerX + innerW, innerY + innerH);
+  pcbGrad.addColorStop(0, '#020f18');
+  pcbGrad.addColorStop(0.4, '#02233b');
+  pcbGrad.addColorStop(1, '#011423');
+  ctx.fillStyle = pcbGrad;
+  ctx.fill();
 
-    // Inner glow edge
-    ctx.strokeStyle = 'rgba(148,163,184,0.25)';
+  // Soft inner glow along edges
+  ctx.strokeStyle = 'rgba(56,189,248,0.25)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.clip();
+
+  // --- Animated "traces" that pulse like data moving around the board ---
+  const t = gameTime || 0;
+
+  function drawTraceStrip(y, phase){
+    const glow = 0.35 + 0.25 * Math.sin(t * 2.0 + phase);
     ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(56,189,248,${glow})`;
+    ctx.beginPath();
+    let x = innerX + 16;
+    ctx.moveTo(x, y);
+    const step = 56;
+    let dir = 1;
+    while (x < innerX + innerW - 24){
+      const nx = x + step;
+      const ny = y + dir * 14;
+      ctx.lineTo(nx, ny);
+      x = nx;
+      y = ny;
+      dir *= -1;
+    }
+    ctx.stroke();
+  }
+
+  // A few horizontal "bus" lines
+  for(let i=0;i<4;i++){
+    const lineY = innerY + innerH*0.2 + i*innerH*0.17;
+    drawTraceStrip(lineY, i*0.9);
+  }
+
+  // Vertical power rails with little indicator nodes
+  ctx.lineWidth = 4;
+  for(let i=0;i<3;i++){
+    const railX = innerX + innerW*0.2 + i*innerW*0.25;
+    const pulse = 0.25 + 0.2 * Math.sin(t*1.6 + i*1.3);
+    ctx.strokeStyle = `rgba(34,197,94,${0.45 + pulse})`;
+    ctx.beginPath();
+    ctx.moveTo(railX, innerY + 24);
+    ctx.lineTo(railX, innerY + innerH - 24);
     ctx.stroke();
 
-    // PCB glow stripes
-    const stripeCount = 6;
-    for(let i=0;i<stripeCount;i++){
-      const y = caseY + 24 + i*(caseH-60)/(stripeCount-1);
-      const animOffset = (gameTime*40 + i*80)%(caseW+120) - 60;
-      const sx = animOffset + caseX;
-      const ex = sx + 120;
-      const grad = ctx.createLinearGradient(sx,y,ex,y);
-      grad.addColorStop(0,'rgba(56,189,248,0)');
-      grad.addColorStop(0.4,'rgba(56,189,248,0.35)');
-      grad.addColorStop(1,'rgba(56,189,248,0)');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 2;
+    // nodes
+    ctx.fillStyle = `rgba(190,242,100,${0.35 + pulse})`;
+    for(let n=0;n<5;n++){
+      const yy = innerY + 32 + n*(innerH-64)/4;
       ctx.beginPath();
-      ctx.moveTo(caseX+8,y);
-      ctx.lineTo(caseX+caseW-8,y);
-      ctx.stroke();
+      ctx.arc(railX, yy, 3.5, 0, Math.PI*2);
+      ctx.fill();
     }
+  }
 
-    // Fans (top-left & bottom-right)
-    const fanR = 42;
-    drawFan(caseX+fanR+24, caseY+fanR+24, fanR, 0);
-    drawFan(caseX+caseW-fanR-24, caseY+caseH-fanR-24, fanR, Math.PI);
-
-    // Subtle grid overlay inside the case window
+  // --- Fans in the corners that actually spin ---
+  function drawFan(cx, cy, radius, phase){
     ctx.save();
+    ctx.translate(cx, cy);
+
+    // Housing ring
+    ctx.fillStyle = '#020617';
     ctx.beginPath();
-    ctx.moveTo(caseX+radius, caseY+8);
-    ctx.lineTo(caseX+caseW-radius, caseY+8);
-    ctx.quadraticCurveTo(caseX+caseW-8, caseY+8, caseX+caseW-8, caseY+radius);
-    ctx.lineTo(caseX+caseW-8, caseY+caseH-radius);
-    ctx.quadraticCurveTo(caseX+caseW-8, caseY+caseH-8, caseX+caseW-radius, caseY+caseH-8);
-    ctx.lineTo(caseX+radius, caseY+caseH-8);
-    ctx.quadraticCurveTo(caseX+8, caseY+caseH-8, caseX+8, caseY+caseH-radius);
-    ctx.lineTo(caseX+8, caseY+radius);
-    ctx.quadraticCurveTo(caseX+8, caseY+8, caseX+radius, caseY+8);
-    ctx.closePath();
-    ctx.clip();
+    ctx.arc(0, 0, radius, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(148,163,184,0.6)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(30,64,175,0.15)';
+    // Rotating blades
+    const rot = t * 4.0 + phase;
+    const blades = 4;
+    ctx.fillStyle = '#0ea5e9';
+    for(let i=0;i<blades;i++){
+      ctx.save();
+      ctx.rotate(rot + i*(Math.PI*2/blades));
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(radius*0.7, -radius*0.2, radius*0.9, 0);
+      ctx.quadraticCurveTo(radius*0.7, radius*0.2, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Center cap
+    ctx.fillStyle = '#e5e7eb';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius*0.18, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  const fanR = 26;
+  drawFan(innerX + fanR + 14, innerY + fanR + 14, fanR, 0.0);
+  drawFan(innerX + innerW - fanR - 14, innerY + fanR + 14, fanR, 0.7);
+  drawFan(innerX + fanR + 14, innerY + innerH - fanR - 14, fanR, 1.4);
+  drawFan(innerX + innerW - fanR - 14, innerY + innerH - fanR - 14, fanR, 2.2);
+
+  // A central "CPU" block that gently pulses
+  const cpuW = innerW * 0.18;
+  const cpuH = innerH * 0.22;
+  const cpuX = innerX + innerW*0.5 - cpuW*0.5;
+  const cpuY = innerY + innerH*0.45 - cpuH*0.5;
+
+  const pulse = 0.15 + 0.1 * Math.sin(t*3.0);
+  const cpuGrad = ctx.createLinearGradient(cpuX, cpuY, cpuX + cpuW, cpuY + cpuH);
+  cpuGrad.addColorStop(0, `rgba(15,23,42,0.95)`);
+  cpuGrad.addColorStop(1, `rgba(30,64,175,${0.7 + pulse})`);
+  ctx.fillStyle = cpuGrad;
+  ctx.fillRect(cpuX, cpuY, cpuW, cpuH);
+
+  ctx.strokeStyle = 'rgba(129,140,248,0.9)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cpuX, cpuY, cpuW, cpuH);
+
+  // Small LEDs under the CPU
+  const ledCount = 6;
+  for(let i=0;i<ledCount;i++){
+    const lx = cpuX + 6 + i*(cpuW-12)/(ledCount-1);
+    const ly = cpuY + cpuH + 10;
+    const phase = t*4 + i*0.7;
+    const a = 0.25 + 0.35*Math.max(0, Math.sin(phase));
+    ctx.fillStyle = `rgba(56,189,248,${a})`;
+    ctx.fillRect(lx-3, ly-2, 6, 4);
+  }
+
+  ctx.restore();
+}
+
+function drawCaseFrame(){
+  const w = world.width;
+  const h = world.height;
+
+  // Outer bezel that stays fixed to the screen (drawn after camera transforms).
+  const pad = 24;
+
+  // Outer shell
+  ctx.save();
+  const outerGrad = ctx.createLinearGradient(0, 0, 0, h);
+  outerGrad.addColorStop(0, '#020617');
+  outerGrad.addColorStop(0.5, '#020617');
+  outerGrad.addColorStop(1, '#000814');
+  ctx.fillStyle = outerGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Inner window cutout
+  const r = 22;
+  const x = pad;
+  const y = pad;
+  const innerW = w - pad*2;
+  const innerH = h - pad*2;
+
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + innerW - r, y);
+  ctx.quadraticCurveTo(x + innerW, y, x + innerW, y + r);
+  ctx.lineTo(x + innerW, y + innerH - r);
+  ctx.quadraticCurveTo(x + innerW, y + innerH, x + innerW - r, y + innerH);
+  ctx.lineTo(x + r, y + innerH);
+  ctx.quadraticCurveTo(x, y + innerH, x, y + innerH - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Glass edge
+  ctx.strokeStyle = 'rgba(148,163,184,0.65)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + innerW - r, y);
+  ctx.quadraticCurveTo(x + innerW, y, x + innerW, y + r);
+  ctx.lineTo(x + innerW, y + innerH - r);
+  ctx.quadraticCurveTo(x + innerW, y + innerH, x + innerW - r, y + innerH);
+  ctx.lineTo(x + r, y + innerH);
+  ctx.quadraticCurveTo(x, y + innerH, x, y + innerH - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.stroke();
+
+  // Tiny "screws" at bezel corners
+  const screwR = 4;
+  const screwCenters = [
+    [x + 12, y + 12],
+    [x + innerW - 12, y + 12],
+    [x + 12, y + innerH - 12],
+    [x + innerW - 12, y + innerH - 12]
+  ];
+  for(const [sx, sy] of screwCenters){
+    ctx.fillStyle = '#020617';
+    ctx.beginPath();
+    ctx.arc(sx, sy, screwR, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(148,163,184,0.7)';
     ctx.lineWidth = 1;
-    for(let x=caseX+16;x<caseX+caseW;x+=40){
-      ctx.beginPath();
-      ctx.moveTo(x,caseY+16);
-      ctx.lineTo(x,caseY+caseH-16);
-      ctx.stroke();
-    }
-    for(let y=caseY+16;y<caseY+caseH;y+=40){
-      ctx.beginPath();
-      ctx.moveTo(caseX+16,y);
-      ctx.lineTo(caseX+caseW-16,y);
-      ctx.stroke();
-    }
-    ctx.restore();
+    ctx.stroke();
 
-    ctx.restore();
-  }function drawXPOrbs(){
+    ctx.beginPath();
+    ctx.moveTo(sx - 2, sy);
+    ctx.lineTo(sx + 2, sy);
+    ctx.moveTo(sx, sy - 2);
+    ctx.lineTo(sx, sy + 2);
+    ctx.stroke();
+  }
+
+  // Bottom info bar where the HUD sits
+  ctx.fillStyle = 'rgba(15,23,42,0.96)';
+  ctx.fillRect(0, h - 46, w, 46);
+
+  // Subtle top glow strip
+  const glowGrad = ctx.createLinearGradient(0, 0, 0, 32);
+  glowGrad.addColorStop(0, 'rgba(56,189,248,0.25)');
+  glowGrad.addColorStop(1, 'rgba(56,189,248,0)');
+  ctx.fillStyle = glowGrad;
+  ctx.fillRect(x + 4, y + 4, innerW - 8, 18);
+
+  ctx.restore();
+}
+function drawXPOrbs(){
     ctx.save();
     ctx.fillStyle = '#22c55e';
     for(const orb of xpOrbs){
@@ -1383,203 +1550,131 @@
   }
 
 function drawHeroBody(){
-    const hero = AVDEF.Heroes.get(currentHeroId);
+    const hero = AVDEF.Heroes.get(currentHeroId) || {};
     ctx.save();
     ctx.translate(player.x,player.y);
-    const baseR = player.radius;
+    ctx.rotate(player.facingAngle);
 
-    const bob = Math.sin(gameTime*4)*1.5;
-
-    // Aura / animation per hero
-    if(hero.id === 'avast'){
-      const pulse = 0.5 + 0.5*Math.sin(gameTime*4);
-      ctx.save();
-      ctx.globalAlpha = 0.12 + 0.08*pulse;
-      ctx.strokeStyle = '#f97316';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0,0,baseR+10+4*pulse,0,Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-    }
-    if(hero.id === 'norton'){
-      const sweep = gameTime*1.5;
-      ctx.save();
-      ctx.strokeStyle = 'rgba(250,204,21,0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0,0,baseR+8,sweep,sweep+Math.PI/3);
-      ctx.stroke();
-      ctx.restore();
-    }
-    if(hero.id === 'q360'){
-      const breath = 2 + Math.sin(gameTime*3)*2;
-      ctx.save();
-      ctx.globalAlpha = 0.15;
-      ctx.strokeStyle = '#22c55e';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0,0,baseR+breath,0,Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Norton emergency shield visual
-    if(hero.id === 'norton' && gameTime < player.nortonShieldActiveUntil){
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.strokeStyle = '#facc15';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0,0,baseR+14,0,Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Body (torso)
     ctx.save();
-    ctx.translate(0,bob);
+    ctx.beginPath();
+    ctx.fillStyle = '#0f172a';
+    ctx.arc(0,0,player.radius+6,0,Math.PI*2);
+    ctx.fill();
 
-    if(hero.id === 'defender'){
-      ctx.fillStyle = '#1d4ed8';
-      ctx.beginPath();
-      ctx.arc(0,0,baseR,0,Math.PI*2);
-      ctx.fill();
-
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.moveTo(0,-10);
-      ctx.lineTo(10,-3);
-      ctx.lineTo(6,10);
-      ctx.lineTo(-6,10);
-      ctx.lineTo(-10,-3);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.moveTo(0,-6);
-      ctx.lineTo(6,-1);
-      ctx.lineTo(3,7);
-      ctx.lineTo(-3,7);
-      ctx.lineTo(-6,-1);
-      ctx.closePath();
-      ctx.fill();
-    } else if(hero.id === 'avg'){
-      ctx.fillStyle = '#111827';
-      ctx.beginPath();
-      ctx.arc(0,0,baseR,0,Math.PI*2);
-      ctx.fill();
-
-      const colors = ['#f97316','#22c55e','#3b82f6','#ef4444'];
-      for(let i=0;i<4;i++){
-        ctx.fillStyle = colors[i];
-        ctx.beginPath();
-        ctx.moveTo(0,0);
-        const a0 = i*Math.PI/2;
-        const a1 = (i+1)*Math.PI/2;
-        ctx.arc(0,0,baseR,a0,a1);
-        ctx.closePath();
-        ctx.fill();
-      }
-    } else if(hero.id === 'avast'){
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.arc(0,0,baseR,0,Math.PI*2);
-      ctx.fill();
-
-      ctx.fillStyle = '#f97316';
-      for(let i=0;i<4;i++){
-        const ang = i*(Math.PI/2);
-        const sx = Math.cos(ang)*(baseR+4);
-        const sy = Math.sin(ang)*(baseR+4);
-        ctx.beginPath();
-        ctx.arc(sx,sy,6,0,Math.PI*2);
-        ctx.fill();
-      }
-      ctx.fillStyle = '#f97316';
-      ctx.beginPath();
-      ctx.arc(0,0,baseR-4,0,Math.PI*2);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(0,0,6,0,Math.PI*2);
-      ctx.fill();
-    } else if(hero.id === 'norton'){
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#facc15';
-      ctx.beginPath();
-      ctx.arc(0,0,baseR,0,Math.PI*2);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#16a34a';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-5,2);
-      ctx.lineTo(-1,8);
-      ctx.lineTo(8,-4);
-      ctx.stroke();
-    } else if(hero.id === 'mcafee'){
-      ctx.fillStyle = '#b91c1c';
-      ctx.beginPath();
-      ctx.moveTo(0,-baseR);
-      ctx.lineTo(baseR*0.9,-baseR*0.2);
-      ctx.lineTo(baseR*0.6,baseR);
-      ctx.lineTo(-baseR*0.6,baseR);
-      ctx.lineTo(-baseR*0.9,-baseR*0.2);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#fef2f2';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-baseR*0.5,0);
-      ctx.lineTo(-baseR*0.25,-baseR*0.3);
-      ctx.lineTo(0,0);
-      ctx.lineTo(baseR*0.25,-baseR*0.3);
-      ctx.lineTo(baseR*0.5,0);
-      ctx.stroke();
-    } else if(hero.id === 'q360'){
-      ctx.fillStyle = '#16a34a';
-      ctx.beginPath();
-      ctx.arc(0,0,baseR,0,Math.PI*2);
-      ctx.fill();
-
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0,0,baseR-4,Math.PI*0.15,Math.PI*1.85);
-      ctx.stroke();
-
-      ctx.fillStyle = '#e5e7eb';
-      ctx.beginPath();
-      ctx.arc(0,0,5,0,Math.PI*2);
-      ctx.fill();
-    }
-
+    const hpFrac = player.hp/player.maxHp;
+    ctx.beginPath();
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 4;
+    ctx.arc(0,0,player.radius+4,-Math.PI/2,-Math.PI/2+hpFrac*Math.PI*2);
+    ctx.stroke();
     ctx.restore();
 
-    // Logo head
-    const imgData = heroImages[hero.id];
-    const headOffsetY = -baseR-6 + bob;
-    if(imgData && imgData.ready){
-      const size = baseR*1.6;
+    ctx.save();
+    const grad = ctx.createLinearGradient(-player.radius,0,player.radius,0);
+    grad.addColorStop(0,'#38bdf8');
+    grad.addColorStop(1,'#22c55e');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(0,0,player.radius*1.2,player.radius,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+
+    if(heroImages[currentHeroId]){
       ctx.save();
-      ctx.translate(0,headOffsetY);
-      ctx.beginPath();
-      ctx.arc(0,0,size*0.52,0,Math.PI*2);
-      ctx.clip();
-      ctx.drawImage(imgData.img,-size/2,-size/2,size,size);
+      ctx.rotate(-player.facingAngle);
+      const img = heroImages[currentHeroId];
+      const size = player.radius*1.2;
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(img,-size*0.7,-size*0.7,size*1.4,size*1.4);
       ctx.restore();
     }else{
-      // Simple fallback head
       ctx.save();
-      ctx.translate(0,headOffsetY);
-      ctx.fillStyle = hero.color || '#e5e7eb';
+      ctx.rotate(-player.facingAngle);
+      ctx.fillStyle = '#0b1120';
       ctx.beginPath();
-      ctx.arc(0,0,baseR*0.8,0,Math.PI*2);
+      ctx.arc(0,0,player.radius*0.65,0,Math.PI*2);
       ctx.fill();
+      ctx.fillStyle = '#e5e7eb';
+      ctx.font = `bold ${player.radius*0.9}px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(hero.initial || '?',0,1);
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(56,189,248,0.55)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(player.radius*0.7,0);
+    ctx.lineTo(player.radius*1.8,0);
+    ctx.stroke();
+    ctx.restore();
+
+    if(gameTime < player.nortonShieldActiveUntil){
+      const t = (player.nortonShieldActiveUntil - gameTime)/3;
+      const blink = 0.6 + 0.4*Math.sin(gameTime*10);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0,Math.min(1,t))*blink;
+      const grad2 = ctx.createRadialGradient(0,0,player.radius*0.6,0,0,player.radius*1.7);
+      grad2.addColorStop(0,'rgba(251,191,36,0.1)');
+      grad2.addColorStop(1,'rgba(251,191,36,0.5)');
+      ctx.fillStyle = grad2;
+      ctx.beginPath();
+      ctx.arc(0,0,player.radius*1.7,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if(scanConeEnabled){
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      const width = Math.PI/6;
+      const start = -width/2;
+      const end = width/2;
+      const r = player.radius*5;
+      const grad = ctx.createRadialGradient(0,0,player.radius*0.4,0,0,r);
+      grad.addColorStop(0,'rgba(56,189,248,0.0)');
+      grad.addColorStop(0.5,'rgba(56,189,248,0.37)');
+      grad.addColorStop(1,'rgba(56,189,248,0.0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0,0,r,start,end);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if(player.orbitLevel>0 && player.orbitProjectiles.length>0){
+      ctx.save();
+      ctx.rotate(-player.facingAngle);
+      for(const orb of player.orbitProjectiles){
+        const ox = Math.cos(orb.angle)*orb.radius;
+        const oy = Math.sin(orb.angle)*orb.radius;
+        ctx.beginPath();
+        ctx.fillStyle = '#38bdf8';
+        ctx.arc(ox,oy,6,0,Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(56,189,248,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.arc(ox,oy,10,0,Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if(gameTime < player.phaseShiftingUntil){
+      const t = (player.phaseShiftingUntil - gameTime)/player.phaseShiftDuration;
+      ctx.save();
+      ctx.globalAlpha = 0.3+0.4*t;
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.arc(0,0,player.radius*1.5,0,Math.PI*2);
+      ctx.stroke();
       ctx.restore();
     }
 
@@ -1590,24 +1685,85 @@ function drawHeroBody(){
     drawHeroBody();
   }
 
-  function drawProjectiles(){
+  
+function drawProjectiles(){
     ctx.save();
     for(const p of projectiles){
-      ctx.beginPath();
       if(p.kind === 'shield' || p.kind === 'shield-toss'){
+        // Keep shield shots as a glowing orb
+        ctx.beginPath();
         const grad = ctx.createLinearGradient(p.x-10,p.y-10,p.x+10,p.y+10);
         grad.addColorStop(0,'#60a5fa');
         grad.addColorStop(1,'#22d3ee');
         ctx.fillStyle = grad;
         ctx.arc(p.x,p.y,p.radius+2,0,Math.PI*2);
-      }else{
-        ctx.fillStyle = '#38bdf8';
-        ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+        ctx.fill();
+        continue;
       }
+
+      // Direction of travel for a small tail
+      const speedLen = Math.hypot(p.vx, p.vy) || 1;
+      const nx = p.vx / speedLen;
+      const ny = p.vy / speedLen;
+      const tailLen = 18;
+
+      const x2 = p.x;
+      const y2 = p.y;
+      const x1 = p.x - nx * tailLen;
+      const y1 = p.y - ny * tailLen;
+
+      // Color palette per hero
+      let inner = '#e0f2fe';
+      let mid   = '#38bdf8';
+      let outer = '#0ea5e9';
+
+      if(currentHeroId === 'avg'){
+        inner = '#fefce8';
+        mid   = '#facc15';
+        outer = '#ca8a04';
+      }else if(currentHeroId === 'avast'){
+        inner = '#ffedd5';
+        mid   = '#fb923c';
+        outer = '#ea580c';
+      }else if(currentHeroId === 'norton'){
+        inner = '#fefce8';
+        mid   = '#fde047';
+        outer = '#facc15';
+      }else if(currentHeroId === 'q360' || currentHeroId === 'total'){
+        inner = '#dcfce7';
+        mid   = '#4ade80';
+        outer = '#16a34a';
+      }else if(currentHeroId === 'mcafee'){
+        inner = '#fee2e2';
+        mid   = '#f97373';
+        outer = '#e11d48';
+      }
+
+      // Draw tail
+      const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+      grad.addColorStop(0, 'rgba(15,23,42,0)');
+      grad.addColorStop(0.4, outer);
+      grad.addColorStop(0.9, mid);
+
+      ctx.lineWidth = Math.max(2, p.radius*0.9);
+      ctx.strokeStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Small glowing core at the tip
+      ctx.beginPath();
+      const coreGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius*1.8);
+      coreGrad.addColorStop(0, inner);
+      coreGrad.addColorStop(1, 'rgba(15,23,42,0)');
+      ctx.fillStyle = coreGrad;
+      ctx.arc(p.x, p.y, p.radius*1.4, 0, Math.PI*2);
       ctx.fill();
     }
     ctx.restore();
   }
+
 
   function drawBeams(){
     ctx.save();
@@ -1751,7 +1907,8 @@ function drawHeroBody(){
   ctx.fillText(player.xp + '/' + player.xpToNext, startX + 6, startY + barHeight + 10);
 
   ctx.restore();
-}function draw(){
+}
+function draw(){
     if (!canvas || !ctx) return;
 
     // Clear in raw canvas pixels
@@ -1761,6 +1918,21 @@ function drawHeroBody(){
     // Scale world space (960x540) to current canvas resolution
     ctx.setTransform(renderScale,0,0,renderScale,0,0);
 
+    // Camera follows the player so the world scrolls underneath.
+    if (gameState === 'playing' || gameState === 'upgrading' || gameState === 'paused' || gameState === 'gameover') {
+      cameraX = player.x;
+      cameraY = player.y;
+    } else {
+      // In menus / title keep camera centered on origin area.
+      cameraX = world.width * 0.5;
+      cameraY = world.height * 0.5;
+    }
+
+    // --- World layer (moves with camera) ---
+    ctx.save();
+    ctx.translate(world.width * 0.5 - cameraX, world.height * 0.5 - cameraY);
+
+    // Interior of the case and everything that exists "inside" the computer
     drawBackgroundCase();
     drawXPOrbs();
     drawParticles();
@@ -1769,8 +1941,17 @@ function drawHeroBody(){
     drawProjectiles();
     drawBeams();
     drawAOEPulses();
+
+    ctx.restore();
+
+    // --- UI layer (fixed to screen) ---
+    ctx.save();
+    ctx.setTransform(renderScale,0,0,renderScale,0,0);
+    drawCaseFrame();
     drawHUD();
+    ctx.restore();
   }
+
 
 
   // --- Pause & menu wiring ---
