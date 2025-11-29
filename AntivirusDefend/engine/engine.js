@@ -22,7 +22,15 @@
 
   const pauseOverlay = document.getElementById('pauseOverlay');
   const btnPauseResume = document.getElementById('btnPauseResume');
-  const btnPauseQuit = document.getElementById('btnPauseQuit');
+  const btnPauseTitle = document.getElementById('btnPauseTitle');
+  const btnPauseQuit = btnPauseTitle || document.getElementById('btnPauseQuit');
+  const btnPauseOptions = document.getElementById('btnPauseOptions');
+  const btnPauseTouch = document.getElementById('btnPauseTouch');
+
+  const optionsOverlay = document.getElementById('optionsOverlay');
+  const optVolume = document.getElementById('optVolume');
+  const optParticles = document.getElementById('optParticles');
+  const optFullscreen = document.getElementById('optFullscreen');
 
   const ransomBar = document.getElementById('ransomBar');
   const ransomTimerBar = document.getElementById('ransomTimerBar');
@@ -66,54 +74,50 @@
   // How many canvas pixels correspond to one world unit (same for X/Y because we keep aspect)
   let renderScale = 1;
 
-  function resizeGameCanvas(){
+  // Camera center in world units (follows the player)
+  let camX = world.width * 0.5;
+  let camY = world.height * 0.5;
+
+
+  
+function resizeGameCanvas(){
     if (!canvas || !ctx) return;
 
-    const targetAspect = BASE_WORLD_WIDTH / BASE_WORLD_HEIGHT;
+    // Measure the actual game wrapper so the canvas matches the visible game window
+    const gameWrap =
+      (canvas.parentElement && canvas.parentElement.classList && canvas.parentElement.classList.contains('game-wrap'))
+        ? canvas.parentElement
+        : document.querySelector('.game-wrap') || canvas.parentElement || document.body;
 
-    // Try to leave space for a header if present
-    const header = document.querySelector('.page-header');
-    const headerRect = header ? header.getBoundingClientRect() : null;
-    const headerHeight = headerRect ? headerRect.height : 0;
+    const rect = gameWrap.getBoundingClientRect();
 
-    const vw = window.innerWidth;
-    const vh = window.innerHeight - headerHeight;
-
-    // Some padding so it doesn't touch edges
-    const padding = 24;
-    const availWidth  = Math.max(320, vw  - padding*2);
-    const availHeight = Math.max(240, vh  - padding*2);
-
-    const availAspect = availWidth / availHeight;
-
-    let displayWidth, displayHeight;
-    if (availAspect > targetAspect){
-      // Limited by height
-      displayHeight = availHeight;
-      displayWidth  = displayHeight * targetAspect;
-    } else {
-      // Limited by width
-      displayWidth  = availWidth;
-      displayHeight = displayWidth / targetAspect;
-    }
+    // Use almost the full wrapper area (a little padding to avoid touching edges)
+    const padding = 6;
+    const availWidth  = Math.max(320, rect.width  - padding * 2);
+    const availHeight = Math.max(240, rect.height - padding * 2);
 
     const dpr = window.devicePixelRatio || 1;
 
-    // Size of the CSS box (world space size)
-    canvas.style.width  = displayWidth + 'px';
-    canvas.style.height = displayHeight + 'px';
+    // Size of the CSS box (display size in CSS pixels)
+    canvas.style.width  = availWidth + 'px';
+    canvas.style.height = availHeight + 'px';
 
-    // Actual backing resolution
-    canvas.width  = Math.round(displayWidth * dpr);
-    canvas.height = Math.round(displayHeight * dpr);
+    // Actual backing resolution (real canvas pixels)
+    canvas.width  = Math.round(availWidth  * dpr);
+    canvas.height = Math.round(availHeight * dpr);
 
-    // How many canvas pixels per world unit
-    renderScale = canvas.width / BASE_WORLD_WIDTH;
-  }
+    // Uniform scale so the 960x540 world fits inside whatever size we ended up with
+    const scaleX = canvas.width  / BASE_WORLD_WIDTH;
+    const scaleY = canvas.height / BASE_WORLD_HEIGHT;
+    renderScale = Math.min(scaleX, scaleY);
+}
 
 
-  let gameState = 'title'; // 'title','heroSelect','stageSelect','playing','paused','upgrading','gameover'
-  let currentMode = 'survivors';
+
+  let currentMode = null;        // No mode running
+  let activePlugin = null;       // Track plugin object
+  let gameState = 'title';       // Just the UI state
+
 
   // --- Player + game state ---
   const player = {
@@ -169,6 +173,9 @@
   const xpOrbs = [];
   const chips = { count: 0 };
   const particles = [];
+  let bestWaveEver = 0;
+  let ramsticks = 0;
+
   const beams = [];
   const aoePulses = [];
 
@@ -344,11 +351,19 @@
   }
 
   function spawnProjectile(x,y,angle,speed,damage,kind){
+    let radius = 6;
+    if(window.AVDEF && AVDEF.Textures && AVDEF.Textures.projectileSprites){
+      const sprites = AVDEF.Textures.projectileSprites;
+      const sprite = sprites[currentHeroId] || sprites.default;
+      if(sprite && typeof sprite.radius === 'number'){
+        radius = sprite.radius;
+      }
+    }
     projectiles.push({
       x,y,
       vx: Math.cos(angle)*speed,
       vy: Math.sin(angle)*speed,
-      radius: 6,
+      radius,
       damage,
       kind,
       life: 3
@@ -381,10 +396,37 @@
     }
   }
 
-  function spawnChip(x,y,amount){
+  function spawnChip(x, y, amount){
+    // Award chips to the player when enemies are defeated.
+    // x, y are reserved for future VFX spawn positions.
+    if (typeof amount !== 'number') amount = 1;
     chips.count += amount;
     updateHUD();
   }
+
+
+function loadProgress(){
+    try{
+      const raw = window.localStorage ? localStorage.getItem('avdefProgress') : null;
+      if(!raw) return;
+      const data = JSON.parse(raw);
+      if(typeof data.bestWave === 'number') bestWaveEver = data.bestWave;
+      if(typeof data.ramsticks === 'number') ramsticks = data.ramsticks;
+    }catch(err){
+      dlog('Failed to load progress', 'warn', { error: String(err) });
+    }
+  }
+
+  function saveProgress(){
+    try{
+      if(!window.localStorage) return;
+      const payload = { bestWave: bestWaveEver, ramsticks };
+      localStorage.setItem('avdefProgress', JSON.stringify(payload));
+    }catch(err){
+      dlog('Failed to save progress', 'warn', { error: String(err) });
+    }
+  }
+
 
   function activateNortonShield(duration,stage){
     player.nortonShieldStage = stage;
@@ -419,6 +461,22 @@
     gameState = 'gameover';
     wavesCompletedThisRun = currentWave-1;
     timeSurvivedThisRun = gameTime;
+
+    // Update persistent progress: highest wave reached this run
+    const reachedWave = Math.max(1, currentWave);
+    if(reachedWave > bestWaveEver){
+      bestWaveEver = reachedWave;
+    }
+
+    // Convert leftover chips into global RAM sticks
+    const gainedRam = chips.count * 0.06;
+    if(gainedRam > 0){
+      ramsticks += gainedRam;
+    }
+    chips.count = 0;
+    saveProgress();
+    updateHUD();
+
     if(gameOverTitle){
       gameOverTitle.textContent = victory ? 'System Secured!' : 'System Compromised!';
     }
@@ -645,28 +703,36 @@
     }
 
     // Aiming (mouse / touch pointer / gamepad right stick)
-    let tx = player.x + Math.cos(player.facingAngle)*10;
-    let ty = player.y + Math.sin(player.facingAngle)*10;
+    let dirX = Math.cos(player.facingAngle);
+    let dirY = Math.sin(player.facingAngle);
 
-    if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number'){
-      tx = input.pointerX;
-      ty = input.pointerY;
+    // Mouse / touch pointer: convert from screen space to world-space
+    // relative to the player (who is kept at the center of the world view).
+    if(typeof input.pointerX === 'number' && typeof input.pointerY === 'number' && renderScale > 0){
+      const sx = input.pointerX / renderScale;
+      const sy = input.pointerY / renderScale;
+      const dx = sx - world.width * 0.5;
+      const dy = sy - world.height * 0.5;
+      if(Math.hypot(dx,dy) > 4){
+        dirX = dx;
+        dirY = dy;
+      }
     }
 
+    // Gamepad right stick aim overrides pointer if active
     if(typeof input.aimStickX === 'number' && typeof input.aimStickY === 'number'){
       const ax2 = input.aimStickX;
       const ay2 = input.aimStickY;
       const dead2 = 0.25;
       if(Math.abs(ax2) > dead2 || Math.abs(ay2) > dead2){
-        tx = player.x + ax2*200;
-        ty = player.y + ay2*200;
+        dirX = ax2;
+        dirY = ay2;
       }
     }
 
-    const mdx = tx - player.x;
-    const mdy = ty - player.y;
-    if(Math.hypot(mdx,mdy) > 4){
-      player.facingAngle = Math.atan2(mdy,mdx);
+    const mag = Math.hypot(dirX, dirY);
+    if(mag > 0.0001){
+      player.facingAngle = Math.atan2(dirY, dirX);
     }
 
     // NOTE: no shooting here anymore – shooting is handled centrally
@@ -796,9 +862,8 @@
         const stunMult = gameTime < player.stunnedUntil ? 0.6 : 1;
         const dmg = baseDamage * stunMult;
 
-        const kind = (currentHeroId === 'defender' && player.shieldLevel > 0)
-          ? 'shield'
-          : 'bullet';
+        // Always use the standard stylized projectile for Defender's basic shots.
+        const kind = 'bullet';
 
         spawnProjectile(player.x, player.y, angle, 260, dmg, kind);
         player.lastShot = nowShoot;
@@ -837,6 +902,66 @@
       const v = vectorToPlayer(e.x,e.y);
       let dx = v.dx;
       let dy = v.dy;
+
+      // Spyware: freezes when the player's scan cone (facingAngle) is pointed at it.
+      if(e.type === 'spyware' && scanConeEnabled){
+        const angleToEnemy = Math.atan2(e.y - player.y, e.x - player.x);
+        let diff = angleToEnemy - player.facingAngle;
+        while(diff > Math.PI) diff -= Math.PI*2;
+        while(diff < -Math.PI) diff += Math.PI*2;
+        const coneWidth = Math.PI/6; // matches the visual cone width
+        const maxAngle = coneWidth/2;
+        const maxDist = player.radius*5; // same as cone radius
+        const dist = Math.hypot(e.x - player.x, e.y - player.y);
+        if(Math.abs(diff) < maxAngle && dist <= maxDist){
+          // Locked by gaze this frame.
+          dx = 0;
+          dy = 0;
+        }
+      }
+
+      // Virus mimics: act as friendly turrets while disguised,
+      // then reveal into aggressive purple viruses when the player gets close.
+      if(e.type === 'virus'){
+        const revealRadius = player.radius*5; // use same radius as the scan cone length
+        const distToPlayerCenter = Math.hypot(e.x - player.x, e.y - player.y);
+        if(e.disguised && distToPlayerCenter <= revealRadius){
+          // Player has entered the mimic's personal bubble: reveal!
+          e.disguised = false;
+        }
+
+        if(e.disguised){
+          // While disguised, stay mostly in place and shoot at other enemies.
+          dx = 0;
+          dy = 0;
+
+          const now = gameTime;
+          const cooldown = 1.2; // seconds between mimic shots
+          if(now - (e.lastAttack || 0) >= cooldown){
+            let target = null;
+            let best = Infinity;
+            for(const other of enemies){
+              if(other === e) continue;
+              if(other.hp <= 0) continue;
+              // Only shoot non-virus enemies so they look like they're helping you.
+              if(other.type === 'virus') continue;
+              const dd = Math.hypot(other.x - e.x, other.y - e.y);
+              if(dd < best){
+                best = dd;
+                target = other;
+              }
+            }
+            if(target){
+              e.lastAttack = now;
+              const ang = Math.atan2(target.y - e.y, target.x - e.x);
+              const dmg = player.baseDamage * player.damageMult * 0.5;
+              spawnProjectile(e.x, e.y, ang, 260, dmg, 'virusTurret');
+            }
+          }
+        }
+      }
+
+
       if(confusedActive){
         const angleOffset = Math.sin(gameTime*4 + e.id)*0.9;
         const ca = Math.cos(angleOffset);
@@ -886,6 +1011,9 @@
       if(e.hp <= 0){
         spawnParticles(e.x,e.y,'#f97373',8);
         spawnXP(e.x,e.y, 5+Math.floor(currentWave/2));
+        // Award some chips based on their XP value (rounded, minimum 1)
+        const chipGain = Math.max(1, Math.floor((e.xpValue || 6) * 0.5));
+        spawnChip(e.x,e.y, chipGain);
         enemies.splice(i,1);
         enemiesRemainingThisWave--;
         if(e.type === 'ransomware'){
@@ -1035,15 +1163,21 @@
       scanConeEnabled = true;
     }
 
+    // Allow current game mode plugin to run custom per-frame logic
+    if(window.AVDEF && AVDEF.GameModes && AVDEF.GameModes[currentMode] && typeof AVDEF.GameModes[currentMode].onUpdate === 'function'){
+      AVDEF.GameModes[currentMode].onUpdate(dt);
+    }
+
     updateHUD();
   }
 
   function updateHUD(){
-    if(uiWave) uiWave.textContent = `Wave ${currentWave}`;
+    const displayBestWave = Math.max(bestWaveEver, currentWave);
+    if(uiWave) uiWave.textContent = `Best ${displayBestWave}`;
     if(uiHP) uiHP.textContent = `HP ${player.hp}/${player.maxHp}`;
     if(uiXP) uiXP.textContent = `XP ${player.xp}/${player.xpToNext}`;
     if(uiLevel) uiLevel.textContent = `LVL ${player.level}`;
-    if(uiChips) uiChips.textContent = `Chips ${chips.count}`;
+    if(uiChips) uiChips.textContent = `Ramsticks ${ramsticks.toFixed(2)}`;
   }
 
   // --- Drawing ---
@@ -1085,7 +1219,26 @@
   }
 
   
+
 function drawBackgroundCase(){
+  const tileW = world.width;
+  const tileH = world.height;
+
+  // Repeat the case art in a small grid around the camera
+  const baseTileX = Math.floor(camX / tileW);
+  const baseTileY = Math.floor(camY / tileH);
+
+  for (let ty = baseTileY - 1; ty <= baseTileY + 1; ty++){
+    for (let tx = baseTileX - 1; tx <= baseTileX + 1; tx++){
+      ctx.save();
+      ctx.translate(tx * tileW, ty * tileH);
+      drawBackgroundCaseSingle();
+      ctx.restore();
+    }
+  }
+}
+
+function drawBackgroundCaseSingle(){
   const w = world.width;
   const h = world.height;
 
@@ -1098,7 +1251,7 @@ function drawBackgroundCase(){
   ctx.fillRect(0, 0, w, h);
 
   // Inner motherboard slab (no grids, just a big PCB plate)
-  const pad = 42;
+  const pad = 24;
   const innerX = pad;
   const innerY = pad + 8;
   const innerW = w - pad*2;
@@ -1464,14 +1617,15 @@ function drawXPOrbs(){
         ctx.arc(px+3,py-3,3,0,Math.PI*2);
         ctx.fill();
       }else if(e.type==='virus'){
-        const defImgData = heroImages['defender'];
-        if(e.disguised && defImgData && defImgData.ready){
+        const defImg = heroImages['defender'];
+        const canDrawLogo = !!(defImg && defImg.complete && defImg.naturalWidth > 0);
+        if(e.disguised && canDrawLogo){
           const size = e.radius*2.4;
           ctx.save();
           ctx.beginPath();
           ctx.arc(0,0,size*0.52,0,Math.PI*2);
           ctx.clip();
-          ctx.drawImage(defImgData.img,-size/2,-size/2,size,size);
+          ctx.drawImage(defImg,-size/2,-size/2,size,size);
           ctx.restore();
         }else if(e.disguised){
           ctx.fillStyle = '#38bdf8';
@@ -1554,30 +1708,6 @@ function drawHeroBody(){
     ctx.save();
     ctx.translate(player.x,player.y);
     ctx.rotate(player.facingAngle);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = '#0f172a';
-    ctx.arc(0,0,player.radius+6,0,Math.PI*2);
-    ctx.fill();
-
-    const hpFrac = player.hp/player.maxHp;
-    ctx.beginPath();
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 4;
-    ctx.arc(0,0,player.radius+4,-Math.PI/2,-Math.PI/2+hpFrac*Math.PI*2);
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.save();
-    const grad = ctx.createLinearGradient(-player.radius,0,player.radius,0);
-    grad.addColorStop(0,'#38bdf8');
-    grad.addColorStop(1,'#22c55e');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.ellipse(0,0,player.radius*1.2,player.radius,0,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
 
     if(heroImages[currentHeroId]){
       ctx.save();
@@ -1690,7 +1820,7 @@ function drawHeroBody(){
 function drawProjectiles(){
     ctx.save();
     for(const p of projectiles){
-      if(p.kind === 'shield' || p.kind === 'shield-toss'){
+      if(p.kind === 'shield'){
         // Keep shield shots as a glowing orb
         ctx.beginPath();
         const grad = ctx.createLinearGradient(p.x-10,p.y-10,p.x+10,p.y+10);
@@ -1706,7 +1836,16 @@ function drawProjectiles(){
       const speedLen = Math.hypot(p.vx, p.vy) || 1;
       const nx = p.vx / speedLen;
       const ny = p.vy / speedLen;
-      const tailLen = 18;
+      let tailLen = 18;
+
+      // Pull projectile sprite shape from AVDEF.Textures.projectileSprites
+      if(window.AVDEF && AVDEF.Textures && AVDEF.Textures.projectileSprites){
+        const sprites = AVDEF.Textures.projectileSprites;
+        const sprite = sprites[currentHeroId] || sprites.default;
+        if(sprite && typeof sprite.tail === 'number'){
+          tailLen = sprite.tail;
+        }
+      }
 
       const x2 = p.x;
       const y2 = p.y;
@@ -1852,13 +1991,41 @@ function drawProjectiles(){
   ctx.fillStyle = '#e5e7eb';
   ctx.fillText('Wave', startX, startY - 14);
   ctx.fillText('LVL',  startX + barWidth + 50, startY - 14);
-  ctx.fillText('Chips',startX + barWidth + 50, startY + barHeight + 6);
+
+  // Little CPU icon next to Chips
+  const cpuIconX = startX + barWidth + 50;
+  const cpuIconY = startY + barHeight + 8;
+  ctx.save();
+  ctx.translate(cpuIconX, cpuIconY);
+  ctx.strokeStyle = '#facc15';
+  ctx.fillStyle = '#020617';
+  ctx.lineWidth = 1;
+  // CPU body
+  ctx.beginPath();
+  ctx.rect(-6, -6, 12, 12);
+  ctx.fill();
+  ctx.stroke();
+  // Pins
+  for(let i=-4;i<=4;i+=4){
+    ctx.beginPath();
+    ctx.moveTo(-8,i); ctx.lineTo(-6,i);
+    ctx.moveTo(6,i);  ctx.lineTo(8,i);
+    ctx.moveTo(i,-8); ctx.lineTo(i,-6);
+    ctx.moveTo(i,6);  ctx.lineTo(i,8);
+    ctx.stroke();
+  }
+  // Core
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(-3,-3,6,6);
+  ctx.restore();
+
+  ctx.fillText('Chips', cpuIconX + 14, startY + barHeight + 6);
 
   ctx.fillStyle = '#38bdf8';
   ctx.fillText(String(currentWave), startX + 40, startY - 14);
   ctx.fillText(String(player.level), startX + barWidth + 82, startY - 14);
   ctx.fillStyle = '#facc15';
-  ctx.fillText(String(chips.count), startX + barWidth + 96, startY + barHeight + 6);
+  ctx.fillText(String(chips.count), cpuIconX + 70, startY + barHeight + 6);
 
   // --- HP Bar ---
   const hpFrac = Math.max(0, Math.min(1, player.hp / player.maxHp));
@@ -1908,14 +2075,11 @@ function draw(){
     // Scale world space (960x540) into the current canvas resolution
     ctx.setTransform(renderScale,0,0,renderScale,0,0);
 
-    // Camera: keep the player near the center when in-game so the world scrolls
-    let camX = world.width * 0.5;
-    let camY = world.height * 0.5;
-
-    if (gameState === 'playing' || gameState === 'upgrading' || gameState === 'paused' || gameState === 'gameover') {
-      camX = player.x;
-      camY = player.y;
-    }
+    // Camera follows the player so the world scrolls around them
+    // Simple smoothing keeps motion from feeling too jerky
+    const camLerp = 0.15;
+    camX += (player.x - camX) * camLerp;
+    camY += (player.y - camY) * camLerp;
 
     // --- World layer (moves with camera) ---
     ctx.save();
@@ -1940,7 +2104,9 @@ function draw(){
     ctx.restore();
   }
 
-
+    // Expose raw draw for external render plugins
+    AVDEF.Engine = AVDEF.Engine || {};
+    AVDEF.Engine._internalDraw = draw;
 
 
   // --- Pause & menu wiring ---
@@ -1954,6 +2120,13 @@ function draw(){
       if(pauseOverlay) pauseOverlay.classList.remove('visible');
     }
   }
+
+  // Let other layers reopen the paused state
+  AVDEF.Engine = AVDEF.Engine || {};
+  AVDEF.Engine.showPauseOverlay = function(){
+    gameState = 'paused';
+    if(pauseOverlay) pauseOverlay.classList.add('visible');
+  };
 
   // --- Button wiring with null checks ---
 
@@ -1969,34 +2142,49 @@ function draw(){
   if(btnQuit){
     btnQuit.addEventListener('click', ()=>{
       if(gameOverOverlay) gameOverOverlay.classList.remove('visible');
-      if(window.AVDEF && AVDEF.Title && AVDEF.Title.showTitleScreen){
-        AVDEF.Title.showTitleScreen();
-      } else if(AVDEF.Engine && AVDEF.Engine.showTitle){
-        AVDEF.Engine.showTitle();
-      } else {
-        gameState = 'title';
-      }
+      // future logic for returning to title/menu can go here
     });
   }
 
-  if(btnPauseResume){
+if(btnPauseResume){
     btnPauseResume.addEventListener('click', ()=>{
       togglePause();
+    });
+  }
+
+  if(btnPauseOptions){
+    btnPauseOptions.addEventListener('click', ()=>{
+      // Sync current engine options into the UI sliders/toggles
+      if(window.AVDEF && AVDEF.Engine && AVDEF.Engine.getOptions){
+        const opts = AVDEF.Engine.getOptions();
+        if(optVolume && typeof opts.volume === 'number'){
+          optVolume.value = String(opts.volume);
+        }
+        if(optParticles){
+          optParticles.checked = !!opts.particles;
+        }
+      }
+      // Hide pause overlay and show options overlay while staying paused
+      if(pauseOverlay) pauseOverlay.classList.remove('visible');
+      if(optionsOverlay) optionsOverlay.classList.add('visible');
     });
   }
 
   if(btnPauseQuit){
     btnPauseQuit.addEventListener('click', ()=>{
       if(pauseOverlay) pauseOverlay.classList.remove('visible');
-      if(window.AVDEF && AVDEF.Title && AVDEF.Title.showTitleScreen){
-        AVDEF.Title.showTitleScreen();
-      } else if(AVDEF.Engine && AVDEF.Engine.showTitle){
-        AVDEF.Engine.showTitle();
-      } else {
-        gameState = 'title';
-      }
     });
   }
+
+  if(btnPauseTouch){
+    const handlePauseTap = (e)=>{
+      e.preventDefault();
+      togglePause();
+    };
+    btnPauseTouch.addEventListener('click', handlePauseTap);
+    btnPauseTouch.addEventListener('touchstart', handlePauseTap, {passive:false});
+  }
+
 
   if(btnPayRansom){
     btnPayRansom.addEventListener('click', ()=>{
@@ -2030,7 +2218,11 @@ function draw(){
     }
 
     scanConeAngle += scanConeSpeed*dt;
-    draw();
+    if(window.AVDEF && AVDEF.Render && AVDEF.Render.draw){
+      AVDEF.Render.draw();
+    }else{
+      draw();
+    }
 
     requestAnimationFrame(loop);
   }
@@ -2078,6 +2270,23 @@ function draw(){
     return selectedStageId;
   };
 
+  // Game mode selection (plugin-based)
+  AVDEF.Engine.setGameMode = function(modeId){
+    currentMode = modeId;
+    dlog('Engine.setGameMode(' + modeId + ')', 'info');
+  };
+
+  AVDEF.Engine.getGameMode = function(){
+    return currentMode;
+  };
+
+  AVDEF.Engine.getGameModeConfig = function(){
+    if(window.AVDEF && AVDEF.GameModes){
+      return AVDEF.GameModes[currentMode] || null;
+    }
+    return null;
+  };
+
   // Start a new run using the currently selected hero + stage
   AVDEF.Engine.startRun = function(){
     const hero = (window.AVDEF && AVDEF.Heroes && AVDEF.Heroes.get)
@@ -2104,20 +2313,27 @@ function draw(){
     gameState = 'playing';
     planWave();
 
+    // Notify current game mode plugin
+    if(window.AVDEF && AVDEF.GameModes && AVDEF.GameModes[currentMode] && typeof AVDEF.GameModes[currentMode].onStartRun === 'function'){
+      AVDEF.GameModes[currentMode].onStartRun();
+    }
+
     dlog('Engine.startRun(): hero=' + currentHeroId + ', stage=' + currentStageId, 'info');
   };
 
-  // Let title.js tell the engine "we're in the title state now"
-  AVDEF.Engine.showTitle = function(){
-    gameState = 'title';
-    dlog('Engine.showTitle()', 'info');
-  };
   
-  // Init
-  resizeGameCanvas();
-  window.addEventListener('resize', resizeGameCanvas);
-
-  updateHUD();
-  dlog('Engine init complete, gameState=' + gameState, 'info');
+  // Start main loop
   requestAnimationFrame(loop);
+
+  // Hook canvas resize to window size
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', resizeGameCanvas);
+    window.addEventListener('orientationchange', resizeGameCanvas);
+  }
+  // Initial sizing once DOM + script are ready
+  resizeGameCanvas();
+
+
+// Let title.js tell the engine "we're in the title state now"
+
 })();
