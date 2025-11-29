@@ -118,6 +118,34 @@ function resizeGameCanvas(){
   let activePlugin = null;       // Track plugin object
   let gameState = 'title';       // Just the UI state
 
+  // Expose minimal mode control API for the plugin / Defender Engine
+  window.AVDEF = window.AVDEF || {};
+  AVDEF.Engine = AVDEF.Engine || {};
+
+  AVDEF.Engine.setMode = function(id, plugin){
+    currentMode = id || null;
+    activePlugin = plugin || null;
+  };
+
+  AVDEF.Engine.getCurrentModeId = function(){
+    return currentMode;
+  };
+
+  AVDEF.Engine.getCurrentPlugin = function(){
+    return activePlugin;
+  };
+
+  AVDEF.Engine.getGameState = function(){
+    return gameState;
+  };
+
+  AVDEF.Engine.setGameState = function(state){
+    if (typeof state === 'string' && state.length) {
+      gameState = state;
+    }
+  };
+
+
 
   // --- Player + game state ---
   const player = {
