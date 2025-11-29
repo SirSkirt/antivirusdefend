@@ -1,0 +1,9 @@
+{
+  "id": "towerdef",
+  "title": "Tower Defense",
+  "description": "Prototype tower defense mode plugin (WIP).",
+  "version": "A.0.4.9-td0",
+  "kind": "minigame",
+  "modeId": "towerdef",
+  "builtin": true
+}
