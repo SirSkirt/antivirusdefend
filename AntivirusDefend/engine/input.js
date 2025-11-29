@@ -48,12 +48,43 @@
   let pointerX = null;
   let pointerY = null;
   let mouseDown = false;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width/rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height/rect.height);
+      dispatchPluginPointer('up', x, y);
 
   // Touch joystick state
-  let joystickActive = false;
-  let joystickTouchId = null;
-  let joystickCenter = { x:0, y:0 };
-  let joystickVec = { x:0, y:0 };
+
+let joystickTouchId = null;
+let joystickCenter = { x:0, y:0 };
+let joystickVec = { x:0, y:0 };
+
+function dispatchPluginPointer(type, x, y){
+  try{
+    if(!window.AVDEF || !AVDEF.Engine || typeof AVDEF.Engine.getGameState !== 'function'){
+      return;
+    }
+    const state = AVDEF.Engine.getGameState();
+    if(state !== 'minigame') return;
+
+    const plugin = (typeof AVDEF.Engine.getCurrentPlugin === 'function')
+      ? AVDEF.Engine.getCurrentPlugin()
+      : null;
+    if(!plugin) return;
+
+    let fn = null;
+    if(type === 'down') fn = plugin.onPointerDown;
+    else if(type === 'move') fn = plugin.onPointerMove;
+    else if(type === 'up') fn = plugin.onPointerUp;
+
+    if(typeof fn === 'function'){
+      fn(x, y);
+    }
+  }catch(e){
+    // Ignore pointer dispatch errors
+  }
+}
+
 
   // Gamepad state
   let usingGamepad = false;
@@ -93,17 +124,28 @@ function screenToCanvas(x,y){
     const rect = canvas.getBoundingClientRect();
     pointerX = (e.clientX - rect.left) * (canvas.width/rect.width);
     pointerY = (e.clientY - rect.top) * (canvas.height/rect.height);
+      dispatchPluginPointer('move', pointerX, pointerY);
   }
 
   function onMouseDown(e){
+    if(!canvas) return;
     if(e.button === 0){
       mouseDown = true;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width/rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height/rect.height);
+      dispatchPluginPointer('down', x, y);
     }
   }
 
   function onMouseUp(e){
+    if(!canvas) return;
     if(e.button === 0){
       mouseDown = false;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width/rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height/rect.height);
+      dispatchPluginPointer('up', x, y);
     }
   }
 
@@ -130,8 +172,13 @@ function screenToCanvas(x,y){
       }else{
         // Right side = firing
         mouseDown = true;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width/rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height/rect.height);
+      dispatchPluginPointer('down', x, y);
         pointerX = pos.x;
         pointerY = pos.y;
+        dispatchPluginPointer('move', pointerX, pointerY);
       }
     }
   }
@@ -163,6 +210,7 @@ function screenToCanvas(x,y){
         // Touch on right side: update pointer (for aiming feel)
         pointerX = pos.x;
         pointerY = pos.y;
+        dispatchPluginPointer('move', pointerX, pointerY);
       }
     }
   }
@@ -179,7 +227,12 @@ function screenToCanvas(x,y){
         touchJoystickBase.classList.remove('visible');
       }else{
         // End firing touch
+        dispatchPluginPointer('up', pointerX, pointerY);
         mouseDown = false;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (canvas.width/rect.width);
+      const y = (e.clientY - rect.top) * (canvas.height/rect.height);
+      dispatchPluginPointer('up', x, y);
       }
     }
   }

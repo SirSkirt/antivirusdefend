@@ -7,6 +7,7 @@
 (function(){
   window.AVDEF = window.AVDEF || {};
   AVDEF.PluginLoader = AVDEF.PluginLoader || {};
+  AVDEF.PluginLoader._loadedScripts = AVDEF.PluginLoader._loadedScripts || {};
 
   // --- Parse a .gmemde manifest ---------------------------------------
   function parseGmemde(text){
@@ -117,6 +118,40 @@
 
         // Don’t overwrite an existing JS-defined mode (like Freeplay)
         if (!AVDEF.GameModes[id]){
+  AVDEF.GameModes[id] = {
+    id: id,
+    label: m.label || m.name || id,
+    name: m.name || m.label || id,
+    description: m.description || '',
+    pluginType: m.type || m.kind || 'gamemode',
+    manifestUrl: entry.url
+  };
+}
+
+// If this manifest declares a script, dynamically load it.
+if (m.script && typeof document !== 'undefined') {
+  var src = m.script;
+  if (!AVDEF.PluginLoader._loadedScripts[src]) {
+    AVDEF.PluginLoader._loadedScripts[src] = 'loading';
+    var scriptEl = document.createElement('script');
+    scriptEl.src = src;
+    scriptEl.async = true;
+    scriptEl.onload = function () {
+      AVDEF.PluginLoader._loadedScripts[src] = 'loaded';
+      if (window.console && console.log) {
+        console.log('[PluginLoader] Loaded script for mode', id, 'from', src);
+      }
+    };
+    scriptEl.onerror = function (e) {
+      AVDEF.PluginLoader._loadedScripts[src] = 'error';
+      if (window.console && console.warn) {
+        console.warn('[PluginLoader] Failed to load script for mode', id, 'from', src, e);
+      }
+    };
+    (document.head || document.documentElement || document.body).appendChild(scriptEl);
+  }
+}
+
           AVDEF.GameModes[id] = {
             id: id,
             label: m.label || m.name || id,

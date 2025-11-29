@@ -146,6 +146,32 @@ function resizeGameCanvas(){
   };
 
 
+function buildPluginContext(){
+  return {
+    canvas: canvas,
+    ctx: ctx,
+    width: canvas ? canvas.width : BASE_WORLD_WIDTH,
+    height: canvas ? canvas.height : BASE_WORLD_HEIGHT,
+    ui: {
+      setWave: function(val){ if (uiWave) uiWave.textContent = String(val); },
+      setHP: function(val){ if (uiHP) uiHP.textContent = String(val); },
+      setChips: function(val){ if (uiChips) uiChips.textContent = String(val); },
+      setXP: function(val){ if (uiXP) uiXP.textContent = String(val); },
+      setLevel: function(val){ if (uiLevel) uiLevel.textContent = String(val); }
+    },
+    input: {
+      getState: function(){
+        if (window.AVDEF && AVDEF.Input && typeof AVDEF.Input.getState === 'function') {
+          try { return AVDEF.Input.getState(); } catch (e) {}
+        }
+        return null;
+      }
+    }
+  };
+}
+
+
+
 
   // --- Player + game state ---
   const player = {
@@ -2134,7 +2160,30 @@ function draw(){
 
     // Expose raw draw for external render plugins
     AVDEF.Engine = AVDEF.Engine || {};
-    AVDEF.Engine._internalDraw = draw;
+
+AVDEF.Engine._internalDraw = function(){
+  const hasEngine = !!(window.AVDEF && AVDEF.Engine);
+  const state = hasEngine && typeof AVDEF.Engine.getGameState === 'function'
+    ? AVDEF.Engine.getGameState()
+    : gameState;
+  const active = hasEngine && typeof AVDEF.Engine.getCurrentPlugin === 'function'
+    ? AVDEF.Engine.getCurrentPlugin()
+    : null;
+
+  if (state === 'minigame' && active && typeof active.onRender === 'function') {
+    try {
+      var ctxObj = active._ctx || buildPluginContext();
+      active._ctx = ctxObj;
+      active.onRender(ctxObj);
+      return;
+    } catch (e) {
+      // Fall back to core draw on error
+    }
+  }
+
+  draw();
+};
+
 
 
   // --- Pause & menu wiring ---
@@ -2236,24 +2285,39 @@ if(btnPauseResume){
     });
   }
 
-  function loop(){
-    const now = performance.now();
-    const dt = Math.min(0.05, (now-lastFrameTime)/1000);
-    lastFrameTime = now;
+  
+function loop(){
+  const now = performance.now();
+  const dt = Math.min(0.05, (now-lastFrameTime)/1000);
+  lastFrameTime = now;
 
-    if(gameState === 'playing'){
-      update(dt);
+  // Figure out current engine state and active plugin
+  const hasEngine = !!(window.AVDEF && AVDEF.Engine);
+  const state = hasEngine && typeof AVDEF.Engine.getGameState === 'function'
+    ? AVDEF.Engine.getGameState()
+    : gameState;
+  const active = hasEngine && typeof AVDEF.Engine.getCurrentPlugin === 'function'
+    ? AVDEF.Engine.getCurrentPlugin()
+    : null;
+
+  if (state === 'minigame') {
+    if (active && typeof active.onUpdate === 'function') {
+      try { active.onUpdate(dt); } catch (e) {}
     }
-
-    scanConeAngle += scanConeSpeed*dt;
-    if(window.AVDEF && AVDEF.Render && AVDEF.Render.draw){
-      AVDEF.Render.draw();
-    }else{
-      draw();
-    }
-
-    requestAnimationFrame(loop);
+  } else if (state === 'playing') {
+    update(dt);
   }
+
+  scanConeAngle += scanConeSpeed*dt;
+  if(window.AVDEF && AVDEF.Render && AVDEF.Render.draw){
+    AVDEF.Render.draw();
+  }else{
+    draw();
+  }
+
+  requestAnimationFrame(loop);
+}
+
 // --- Public engine API for title.js / menus ---
   window.AVDEF = window.AVDEF || {};
   AVDEF.Engine = AVDEF.Engine || {};
@@ -2316,38 +2380,66 @@ if(btnPauseResume){
   };
 
   // Start a new run using the currently selected hero + stage
-  AVDEF.Engine.startRun = function(){
-    const hero = (window.AVDEF && AVDEF.Heroes && AVDEF.Heroes.get)
-      ? AVDEF.Heroes.get(selectedHeroId)
-      : null;
 
-    if(!hero){
-      dlog('Engine.startRun: hero not found ' + selectedHeroId, 'error');
-      return;
+AVDEF.Engine.startRun = function(){
+  // Determine which mode is active
+  var modeId = currentMode || 'freeplay';
+  var plugin = (window.AVDEF && AVDEF.GameModes) ? AVDEF.GameModes[modeId] : null;
+
+  // If this mode is implemented as a standalone plugin (e.g. Tower Defense),
+  // hand over control to the plugin instead of running the core Freeplay loop.
+  if (plugin && typeof plugin.onInit === 'function' && modeId !== 'freeplay') {
+    var ctxObj = plugin._ctx || buildPluginContext();
+    plugin._ctx = ctxObj;
+
+    if (!plugin._initialized && typeof plugin.onInit === 'function') {
+      try { plugin.onInit(ctxObj); } catch (e) {}
+      plugin._initialized = true;
     }
 
-    currentHeroId = hero.id;
-    applyHeroStats(currentHeroId);
-
-    const stage = (window.AVDEF && AVDEF.Stages && AVDEF.Stages.get)
-      ? AVDEF.Stages.get(selectedStageId)
-      : null;
-
-    if(stage && stage.unlocked){
-      currentStageId = stage.id;
+    if (typeof plugin.onStartRun === 'function') {
+      try { plugin.onStartRun(); } catch (e) {}
     }
 
-    resetGame();
-    gameState = 'playing';
-    planWave();
+    AVDEF.Engine.setMode(modeId, plugin);
+    AVDEF.Engine.setGameState('minigame');
 
-    // Notify current game mode plugin
-    if(window.AVDEF && AVDEF.GameModes && AVDEF.GameModes[currentMode] && typeof AVDEF.GameModes[currentMode].onStartRun === 'function'){
-      AVDEF.GameModes[currentMode].onStartRun();
-    }
+    dlog('Engine.startRun(): starting plugin mode ' + modeId, 'info');
+    return;
+  }
 
-    dlog('Engine.startRun(): hero=' + currentHeroId + ', stage=' + currentStageId, 'info');
-  };
+  // Default behaviour: start the core Defender / Freeplay run
+  const hero = (window.AVDEF && AVDEF.Heroes && AVDEF.Heroes.get)
+    ? AVDEF.Heroes.get(selectedHeroId)
+    : null;
+
+  if(!hero){
+    dlog('Engine.startRun: hero not found ' + selectedHeroId, 'error');
+    return;
+  }
+
+  currentHeroId = hero.id || selectedHeroId;
+  applyHeroPreset(hero);
+
+  const stage = (window.AVDEF && AVDEF.Stages && AVDEF.Stages.get)
+    ? AVDEF.Stages.get(selectedStageId)
+    : null;
+
+  if(stage && stage.unlocked){
+    currentStageId = stage.id;
+  }
+
+  resetGame();
+  gameState = 'playing';
+  planWave();
+
+  // Notify current game mode plugin (for overlay-style modes that still piggyback on Freeplay)
+  if(window.AVDEF && AVDEF.GameModes && AVDEF.GameModes[currentMode] && typeof AVDEF.GameModes[currentMode].onStartRun === 'function'){
+    try { AVDEF.GameModes[currentMode].onStartRun(); } catch (e) {}
+  }
+
+  dlog('Engine.startRun(): hero=' + currentHeroId + ', stage=' + currentStageId, 'info');
+};
 
   
   // Start main loop
