@@ -1,7 +1,0 @@
-{
-  "id": "towerdef",
-  "name": "Tower Defense",
-  "description": "Prototype tower defense mode plugin (WIP).",
-  "engineVersion": "A.0.4.9",
-  "modeType": "towerdef_core"
-}
