@@ -1,0 +1,33 @@
+Antivirus Defend – Freeplay/TD Plugin Work (current session)
+
+- Merged Freeplay plugin control with Tower Defense canvas layout engine.
+- Wired Freeplay to run as a plugin in 'playing' state, delegating to the legacy Defender update loop.
+- Ensured TD still runs as a pure plug‑in mode using 'minigame' state.
+- Fixed main loop so:
+  • TD: state='minigame' → plugin.onUpdate(dt)
+  • Freeplay: state='playing' + active.id==='freeplay' → plugin.onUpdate(dt)
+  • Legacy: state='playing' and no plugin → update(dt)
+- No changes to input, sprites, or TD gameplay logic from this patch.
+
+Patch 2 – Fix Freeplay update recursion
+- Stopped the Freeplay plugin from being called a second time inside the core update() loop.
+- Now Freeplay's plugin onUpdate drives stepFreeplay() once per frame via the main loop only.
+
+
+[phase2-step1]
+- Hardened AVDEF.Engine.stepFreeplay() so it only runs when currentMode === 'freeplay' and gameState === 'playing'.
+- This is the first cleanup step toward fully isolating Freeplay logic into the plugin.
+
+[phase2-step2]
+- Marked the legacy Freeplay gameplay core in engine.js with BEGIN/END comments.
+- Added AVDEF.Freeplay API (getPlayer/getEnemies/getProjectiles/resetGame/planWave/update)
+  so the Freeplay plugin can talk to legacy state and logic through the engine.
+- Updated freeplay_core.js:onUpdate to call AVDEF.Freeplay.update(dt) instead of
+  AVDEF.Engine.stepFreeplay(dt), so the plugin formally owns Freeplay's update loop entry.
+
+[phase2-step3]
+- Extended AVDEF.Freeplay API with draw(ctxObj) that wraps the legacy draw() function in engine.js.
+- Updated AVDEF.Engine._internalDraw to route rendering through active plugin.onRender(ctxObj)
+  when either state === 'minigame' (pure plugin modes) or state === 'playing' with the Freeplay plugin.
+- Updated freeplay_core.js:onRender to delegate to AVDEF.Freeplay.draw(), so the Freeplay plugin
+  formally owns the render entry point while still using the engine's existing draw() implementation.

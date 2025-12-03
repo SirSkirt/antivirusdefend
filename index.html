@@ -1,728 +1,375 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>Antivirus Defend – A.0.4.9 Alpha (Minigames)</title>
-<style>
-  :root{
-    --bg-top:#020617;
-    --bg-bottom:#020c1f;
-    --panel:#0f172a;
-    --accent:#38bdf8;
-    --danger:#f97373;
-    --chip:#facc15;
-    
-      /* Mobile touch joystick */
-  #touchJoystickBase{
-    position:fixed;
-    width:80px;
-    height:80px;
-    border-radius:9999px;
-    border:1px solid rgba(148,163,184,0.6);
-    background:rgba(15,23,42,0.7);
-    box-shadow:0 0 0 1px rgba(15,23,42,0.9);
-    opacity:0;
-    pointer-events:none;
-    transform:translate(-9999px,-9999px);
-    transition:opacity 0.12s ease-out;
-    z-index:30;
-  }
-  #touchJoystickBase.visible{
-    opacity:1;
-  }
-  #touchJoystickStick{
-    position:absolute;
-    left:20px;
-    top:20px;
-    width:40px;
-    height:40px;
-    border-radius:9999px;
-    background:rgba(148,163,184,0.8);
-    box-shadow:0 0 0 1px rgba(15,23,42,0.9);
-  }
+<DOCUMENT filename="index.html">
+    <!doctype html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+        <title>Defender Engine – Dev Shell (Alpha)</title>
+        <style>
+            :root {
+                --bg-top: #020617;
+                --bg-bottom: #020c1f;
+                --panel: #0f172a;
+                --accent: #38bdf8;
+                --danger: #f97373;
+                --chip: #facc15;
+                /* Mobile touch joystick */
+                #touchJoystickBase
 
-  }
-  html,body{
-    margin:0;
-    padding:0;
-    height:100%;
-    width:100%;
-    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    color:#e5e7eb;
-    background:radial-gradient(circle at top,var(--bg-top),var(--bg-bottom));
-    overflow:hidden;
-  }
-  .root{
-    display:flex;
-    flex-direction:column;
-    height:100%;
-    width:100%;
-  }
-  .top-bar{
-    flex:0 0 auto;
-    padding:6px 10px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    background:rgba(15,23,42,0.9);
-    border-bottom:1px solid rgba(148,163,184,0.3);
-    font-size:12px;
-    box-sizing:border-box;
-  }
-  .title{
-    font-size:13px;
-    font-weight:600;
-    letter-spacing:0.03em;
-    display:flex;
-    align-items:center;
-;
-    gap:8px;
-  }
-  .badge{
-    margin-left:4px;
-    padding:2px 6px;
-    border-radius:999px;
-    border:1px solid rgba(56,189,248,0.6);
-    background:rgba(56,189,248,0.15);
-    color:#7dd3fc;
-    font-size:10px;
-  }
-  .top-stats{
-    display:flex;
-    gap:8px;
-    align-items:center;
-    font-size:11px;
-  }
-  .pill{
-    padding:3px 7px;
-    border-radius:999px;
-    background:rgba(15,23,42,0.8);
-    border:1px solid rgba(148,163,184,0.35);
-    display:flex;
-    align-items:center;
-    gap:4px;
-  }
-  .pill-label{color:#9ca3af;font-size:10px;}
-  .pill-value{font-weight:600;}
+            {
+                position: fixed;
+                width: 80px;
+                height: 80px;
+                border-radius: 9999px;
+                border: 1px solid rgba(148,163,184,0.6);
+                background: rgba(15,23,42,0.7);
+                box-shadow: 0 0 0 1px rgba(15,23,42,0.9);
+                opacity: 0;
+                pointer-events: none;
+                transform: translate(-9999px,-9999px);
+                transition: opacity 0.12s ease-out;
+                z-index: 30;
+            }
 
-  .game-wrap{
-    flex:1 1 auto;
-    position:relative;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    padding:6px;
-    box-sizing:border-box;
-  }
-  
-  .pause-touch-btn{
-    position:absolute;
-    top:10px;
-    right:16px;
-    width:32px;
-    height:32px;
-    border-radius:999px;
-    background:rgba(15,23,42,0.9);
-    border:1px solid rgba(148,163,184,0.7);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:16px;
-    color:#e5e7eb;
-    box-shadow:0 0 12px rgba(0,0,0,0.6);
-    cursor:pointer;
-    z-index:8;
-  }
-  .pause-touch-btn:active{
-    transform:scale(0.96);
-  }
+            #touchJoystickBase.visible {
+                opacity: 1;
+            }
 
-canvas{
-    background:#020617;
-    border-radius:14px;
-    border:2px solid #020c1f;
-    box-shadow:0 18px 40px rgba(0,0,0,0.8);
-    touch-action:none;
-  }
+            #touchJoystickStick {
+                position: absolute;
+                left: 20px;
+                top: 20px;
+                width: 40px;
+                height: 40px;
+                border-radius: 9999px;
+                background: rgba(148,163,184,0.8);
+                box-shadow: 0 0 0 1px rgba(15,23,42,0.9);
+            }
 
-  /* Joystick for touch */
-  .joystick-wrap{
-    display:none;
-    position:absolute;
-    left:8px;
-    bottom:12px;
-    width:120px;
-    height:120px;
-    pointer-events:auto;
-    touch-action:none;
-    z-index:5;
-  }
-  .joy-base{
-    position:absolute;
-    inset:auto;
-    width:100%;
-    height:100%;
-    border-radius:50%;
-    background:rgba(15,23,42,0.7);
-    border:1px solid rgba(148,163,184,0.6);
-  }
-  .joy-knob{
-    position:absolute;
-    left:50%;
-    top:50%;
-    width:44px;
-    height:44px;
-    margin-left:-22px;
-    margin-top:-22px;
-    border-radius:50%;
-    background:rgba(56,189,248,0.9);
-    box-shadow:0 0 18px rgba(56,189,248,0.8);
-  }
+            }
 
-  /* Overlays */
-  .overlay{
-    position:absolute;
-    inset:0;
-    display:none;
-    align-items:center;
-    justify-content:center;
-    pointer-events:none;
-    z-index:10;
-  }
-  .overlay.visible{
-    display:flex;
-    pointer-events:auto;
-  }
-  .panel{
-    min-width:260px;
-    max-width:90vw;
-    padding:18px 18px 14px;
-    border-radius:14px;
-    background:rgba(15,23,42,0.97);
-    box-shadow:0 20px 50px rgba(0,0,0,0.9);
-    border:1px solid rgba(148,163,184,0.5);
-  }
-  .panel h2{
-    margin:0 0 8px;
-    font-size:20px;
-  }
-  .panel h3{
-    margin:8px 0 4px;
-    font-size:14px;
-  }
-  .panel p{
-    margin:4px 0;
-    font-size:12px;
-    color:#cbd5f5;
-  }
-  .btn-row{
-    margin-top:10px;
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-  }
-  button{
-    border:none;
-    border-radius:999px;
-    padding:7px 12px;
-    font-size:12px;
-    font-weight:600;
-    cursor:pointer;
-    background:#0ea5e9;
-    color:#020617;
-  }
-  button.secondary{
-    background:#111827;
-    color:#e5e7eb;
-    border:1px solid rgba(148,163,184,0.7);
-  }
-  button.danger{
-    background:#f97373;
-    color:#111827;
-  }
-  button:disabled{
-    opacity:0.5;
-    cursor:default;
-  }
+            html, body {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                width: 100%;
+                font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+                color: #e5e7eb;
+                background: radial-gradient(circle at top,var(--bg-top),var(--bg-bottom));
+                overflow: hidden;
+            }
 
-  .upgrade-grid{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    margin-top:8px;
-  }
-  .upgrade-card{
-    flex:1 1 120px;
-    min-width:0;
-    border-radius:10px;
-    padding:8px;
-    background:rgba(15,23,42,0.9);
-    border:1px solid rgba(148,163,184,0.5);
-    cursor:pointer;
-    font-size:11px;
-  }
-  .upgrade-card h3{
-    margin:0 0 4px;
-    font-size:13px;
-  }
-  .upgrade-card:hover{
-    border-color:rgba(56,189,248,0.9);
-    box-shadow:0 0 0 1px rgba(56,189,248,0.6);
-  }
+            .root {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                width: 100%;
+            }
 
-  /* Ransomware bar */
-  .ransom-bar{
-    position:absolute;
-    left:50%;
-    bottom:10px;
-    transform:translateX(-50%);
-    padding:6px 10px;
-    border-radius:999px;
-    background:rgba(15,23,42,0.95);
-    border:1px solid rgba(248,250,252,0.12);
-    font-size:11px;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    z-index:9;
-  }
+            .top-bar {
+                flex: 0 0 auto;
+                padding: 6px 10px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: rgba(15,23,42,0.9);
+                border-bottom: 1px solid rgba(148,163,184,0.3);
+                font-size: 12px;
+                box-sizing: border-box;
+            }
 
-  /* Title screen */
-  .game-title{
-    font-size:26px;
-    font-weight:800;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    margin-bottom:10px;
-  }
-  .subtitle{
-    font-size:11px;
-    color:#9ca3af;
-    margin-bottom:12px;
-  }
-  .menu-button{
-    width:100%;
-    justify-content:space-between;
-  }
-  .menu-button span{
-    flex:1;
-    text-align:left;
-  }
-  .menu-hint{
-    font-size:10px;
-    color:#9ca3af;
-  }
-  .tag-pill{
-    font-size:10px;
-    padding:2px 6px;
-    border-radius:999px;
-    background:rgba(15,23,42,0.95);
-    border:1px solid rgba(148,163,184,0.5);
-  }
-  .disabled-tip{
-    font-size:10px;
-    color:#9ca3af;
-    margin-top:4px;
-  }
+            .title {
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 0.03em;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
 
-  /* Hero select */
-  .hero-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-    gap:8px;
-    margin-top:10px;
-  }
-  .hero-card{
-    position:relative;
-    border-radius:10px;
-    padding:8px;
-    background:rgba(15,23,42,0.96);
-    border:1px solid rgba(148,163,184,0.6);
-    cursor:pointer;
-    font-size:11px;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
-  .hero-card.selected{
-    border-color:var(--accent);
-    box-shadow:0 0 0 1px rgba(56,189,248,0.8);
-  }
+            .badge {
+                margin-left: 4px;
+                padding: 2px 6px;
+                border-radius: 999px;
+                border: 1px solid rgba(56,189,248,0.6);
+                background: rgba(56,189,248,0.15);
+                color: #7dd3fc;
+                font-size: 10px;
+            }
 
-  
-  /* Game mode list */
-  .mode-list{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    margin-top:10px;
-  }
-  .mode-card{
-    border-radius:10px;
-    padding:8px 10px;
-    background:rgba(15,23,42,0.96);
-    border:1px solid rgba(148,163,184,0.6);
-    cursor:pointer;
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    text-align:left;
-  }
-  .mode-card-title{
-    font-size:14px;
-    font-weight:600;
-  }
-  .mode-card-desc{
-    font-size:11px;
-    color:#9ca3af;
-  }
-/* Stage select cards */
-  .stage-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
-    gap:8px;
-    margin-top:10px;
-  }
-  .stage-card{
-    position:relative;
-    border-radius:10px;
-    padding:8px;
-    background:rgba(15,23,42,0.96);
-    border:1px solid rgba(148,163,184,0.6);
-    font-size:11px;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-    cursor:pointer;
-  }
-  .stage-card.selected{
-    border-color:var(--accent);
-    box-shadow:0 0 0 1px rgba(56,189,248,0.8);
-  }
-  .stage-card.locked{
-    opacity:0.55;
-    cursor:default;
-  }
-  .stage-name{
-    font-size:12px;
-    font-weight:600;
-  }
-  .stage-meta{
-    font-size:10px;
-    color:#9ca3af;
-  }
-  .stage-lock{
-    position:absolute;
-    top:6px;
-    right:8px;
-    font-size:13px;
-    opacity:0.85;
-  }
-  .hero-header{
-    display:flex;
-    align-items:center;
-    gap:6px;
-  }
-  .hero-icon{
-    width:26px;
-    height:26px;
-    border-radius:8px;
-    background:rgba(15,23,42,0.9);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
-    flex-shrink:0;
-    font-size:13px;
-    font-weight:700;
-  }
-  .hero-icon img{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    display:block;
-  }
-  .hero-name{
-    font-size:12px;
-    font-weight:600;
-  }
-  .hero-role{
-    font-size:10px;
-    color:#9ca3af;
-  }
-  .hero-desc{
-    font-size:10px;
-    color:#cbd5f5;
-  }
-  .stat-line{
-    font-size:10px;
-    color:#9ca3af;
-  }
+            .top-stats {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                font-size: 11px;
+            }
 
-  /* Options */
-  .options-row{
-    margin-top:8px;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    font-size:12px;
-  }
-  .options-row label{
-    display:flex;
-    align-items:center;
-    gap:6px;
-  }
-  .options-row input[type="range"]{
-    width:100%;
-  }
+            .pill {
+                padding: 3px 7px;
+                border-radius: 999px;
+                background: rgba(15,23,42,0.8);
+                border: 1px solid rgba(148,163,184,0.35);
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
 
-  /* How to play */
-  .section-title{
-    margin-top:8px;
-    margin-bottom:4px;
-    font-size:13px;
-    font-weight:600;
-  }
-  .bullet-list{
-    margin:2px 0 4px 16px;
-    padding:0;
-    font-size:11px;
-    color:#cbd5f5;
-  }
-  .bullet-list li{
-    margin:2px 0;
-  }
+            .pill-label {
+                color: #9ca3af;
+                font-size: 10px;
+            }
 
-  @media (max-width:640px){
-    .top-bar{padding:4px 6px;}
-    .title{font-size:12px;}
-    canvas{border-radius:10px;}
-    .joystick-wrap{
-      width:110px;
-      height:110px;
-    }
-    .game-title{font-size:22px;}
-  }
-</style>
-</head>
-<body>
-<div class="root">
-  <div class="top-bar">
-    <div class="title">
-      <span>Antivirus Defend</span>
-      <span class="badge">A.0.4.9 Alpha • Minigames</span>
-    </div>
-    <div class="top-stats">
-      <div class="pill">
-        <span class="pill-label">Best Wave</span>
-        <span class="pill-value" id="uiWave">0</span>
-      </div>
-      <div class="pill">
-        <span class="pill-label">HP</span>
-        <span class="pill-value" id="uiHP">5</span>
-      </div>
-      <div class="pill">
-        <span class="pill-label">Ramsticks</span>
-        <span class="pill-value" id="uiChips">0</span>
-      </div>
-    </div>
-  </div>
+            .pill-value {
+                font-weight: 600;
+            }
 
-  <div class="game-wrap">
-    <canvas id="gameCanvas"></canvas>
-    <div class="pause-touch-btn" id="btnPauseTouch">❚❚</div>
+            .game-wrap {
+                flex: 1 1 auto;
+                position: relative;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 6px;
+                box-sizing: border-box;
+            }
 
-    <!-- TITLE SCREEN -->
-    <div class="overlay visible" id="titleOverlay">
-      <div class="panel">
-        <div class="game-title">ANTIVIRUS DEFEND</div>
-        <div class="subtitle">Secure the OS. Eliminate the threats. Survive the waves.</div>
-        <div class="btn-row" style="flex-direction:column;">
-          <button class="menu-button secondary" id="btnStory" disabled>
-            <span>Story Mode</span>
-            <span class="tag-pill">Under Construction</span>
-          </button>
-          <div class="disabled-tip">Story Mode is currently under construction.</div>
+            .pause-touch-btn {
+                position: absolute;
+                top: 10px;
+                right: 16px;
+                width: 32px;
+                height: 32px;
+                border-radius: 999px;
+                background: rgba(15,23,42,0.9);
+                border: 1px solid rgba(148,163,184,0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                color: #e5e7eb;
+                box-shadow: 0 0 0 0 1px rgba(15,23,42,0.9);
+                cursor: pointer;
+                z-index: 8;
+            }
 
-          <button class="menu-button" id="btnFreeplay">
-            <span>Minigames</span>
-            <span class="menu-hint">Play Freeplay or other modes</span>
-          </button>
+                .pause-touch-btn:active {
+                    transform: scale(0.96);
+                }
 
-          <button class="menu-button secondary" id="btnOptions">
-            <span>Options</span>
-            <span class="menu-hint">Sound & volume</span>
-          </button>
+            canvas {
+                background: #020617;
+                border-radius: 14px;
+                border: 2px solid #020c1f;
+                box-shadow: 0 18px 40px rgba(0,0,0,0.8);
+                touch-action: none;
+            }
+            /* Joystick for touch */
+            .joystick-wrap {
+                display: none;
+                position: absolute;
+                left: 8px;
+                bottom: 12px;
+                width: 120px;
+                height: 120px;
+                pointer-events: auto;
+                touch-action: none;
+                z-index: 5;
+            }
 
-          <button class="menu-button secondary" id="btnHowTo">
-            <span>How To Play</span>
-            <span class="menu-hint">Heroes & enemies explained</span>
-          </button>
+            .joy-base {
+                position: absolute;
+                inset: auto;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                background: rgba(15,23,42,0.7);
+                border: 1px solid rgba(148,163,184,0.6);
+            }
 
-          <button class="menu-button danger" id="btnExit">
-            <span>Exit</span>
-            <span class="menu-hint">Close browser tab</span>
-          </button>
-        </div>
-      </div>
-    </div>
+            .joy-knob {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: 44px;
+                height: 44px;
+                margin-left: -22px;
+                margin-top: -22px;
+                border-radius: 50%;
+                background: rgba(56,189,248,0.9);
+                box-shadow: 0 0 18px rgba(56,189,248,0.8);
+            }
+            /* Overlays */
+            .overlay {
+                position: absolute;
+                inset: 0;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+                z-index: 10;
+            }
 
-    <!-- MINIGAMES / GAME MODES -->
-    <div class="overlay" id="modesOverlay">
-      <div class="panel">
-        <h2>Minigames</h2>
-        <p>Select a mode to play. Installed plugins will appear here automatically.</p>
-        <div class="mode-list" id="modeList"></div>
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="secondary" id="btnModesBack">Back</button>
-        </div>
-      </div>
-    </div>
+                .overlay.visible {
+                    display: flex;
+                    pointer-events: auto;
+                }
 
-    <!-- HERO SELECT -->
-    <div class="overlay" id="heroSelectOverlay">
-      <div class="panel">
-        <h2>Select Your Antivirus</h2>
-        <p>Choose a hero, then pick a stage.</p>
-        <div class="hero-grid" id="heroGrid"></div>
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="secondary" id="btnHeroBack">Back</button>
-          <button id="btnHeroStart">Start Freeplay</button>
-        </div>
-      </div>
-    </div>
+            .panel {
+                min-width: 260px;
+                max-width: 90vw;
+                padding: 18px 18px 14px;
+                border-radius: 14px;
+                background: rgba(15,23,42,0.97);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+                border: 1px solid rgba(148,163,184,0.5);
+            }
 
-    <!-- STAGE SELECT -->
-    <div class="overlay" id="stageOverlay">
-      <div class="panel">
-        <h2>Select Stage</h2>
-        <p>Pick a stage. Only <b>Computer</b> is available in this build.</p>
-        <div class="stage-grid" id="stageGrid"></div>
-        <div class="btn-row" style="margin-top:12px;">
-          <button class="secondary" id="btnStageBack">Back</button>
-          <button id="btnStageStart">Start Stage</button>
-        </div>
-      </div>
-    </div>
+                .panel h2 {
+                    margin: 0 0 8px;
+                    font-size: 20px;
+                }
 
-    <!-- Options -->
-    <div class="overlay" id="optionsOverlay">
-      <div class="panel">
-        <h2>Options</h2>
-        <p>Adjust sound settings for Antivirus Defend.</p>
-        <div class="options-row">
-          <label>
-            <input type="checkbox" id="optSfx" checked />
-            Enable sound effects
-          </label>
-          <label>
-            Master volume
-            <input type="range" id="optVolume" min="0" max="1" step="0.05" value="0.8" />
-          </label>
-        </div>
-        <div class="btn-row">
-          <button id="btnOptionsBack">Back</button>
-        </div>
-      </div>
-    </div>
+                .panel h3 {
+                    margin: 8px 0 4px;
+                    font-size: 14px;
+                }
 
-    <!-- How to play / Info -->
-    <div class="overlay" id="infoOverlay">
-      <div class="panel" style="max-height:80vh;overflow:auto;">
-        <h2>How To Play</h2>
-        <p><b>Move</b>: WASD / Arrow keys (desktop) or joystick (touch).</p>
-        <p><b>Attacks</b> are automatic. Stay alive, gather chips, level up to get upgrades, and survive the waves.</p>
+                .panel p {
+                    margin: 4px 0;
+                    font-size: 12px;
+                    color: #cbd5f5;
+                }
 
-        <div class="section-title">Heroes</div>
-        <ul class="bullet-list">
-          <li><b>Windows Defender</b> – The youngest Antivirus on the team, ready to save his favourite OS: Windows. Abilities: Shield-flavoured shots and upgradeable Defender shield tosses.</li>
-          <li><b>AVG</b> – One of the older Antiviruses. Moves slower and doesn&apos;t see quite as well, but hits hard. Abilities: Digital antibody shots that slow and confuse some enemies.</li>
-          <li><b>Avast</b> – Says it&apos;s free to unlock, but the subscription is where the real power is. Abilities: Free Trial glow that highlights nearby threats, plus a weak knockback pulse. Paid upgrades: stronger pulses that make threats attack each other and faster movement.</li>
-          <li><b>Norton</b> – Grandfather of Antiviruses; rolls in like a tank and uses echolocation. Abilities: Beam-style precise hits with combo damage and a protective shield that triggers at low HP thresholds.</li>
-          <li><b>McAfee</b> – Best when paired with Windows Defender. Abilities: Tag Team call-in that summons Defender to fight beside you and high-accuracy shield throws.</li>
-          <li><b>360 Total Security</b> – Fast, agile, all-rounder with balanced offence and defence.</li>
-        </ul>
+            .btn-row {
+                margin-top: 10px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
 
-        <div class="section-title">Enemies</div>
-        <ul class="bullet-list">
-          <li><b>Adware</b> – Rushes you with pop-up windows. When it hits, it can stun you and/or invert controls.</li>
-          <li><b>Spyware</b> – An eye that watches you. It moves when you aren&apos;t looking; your scan cone freezes it when it&apos;s in view.</li>
-          <li><b>Virus (Mimic)</b> – Pretends to be Windows Defender&apos;s logo until you get too close, then reveals itself as a spiky purple virus.</li>
-          <li><b>Ransomware</b> – Tanky lock that can steal one of your abilities and ransom it for chips. Kill it or pay up.</li>
-        </ul>
+            button {
+                border: none;
+                border-radius: 999px;
+                padding: 7px 12px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                background: #0ea5e9;
+                color: #020617;
+            }
 
-        <div class="btn-row">
-          <button id="btnInfoBack">Back</button>
-        </div>
-      </div>
-    </div>
-   
-    <!-- Upgrade overlay -->
-    <div class="overlay" id="upgradeOverlay">
-      <div class="panel">
-        <h2>Software Upgrade</h2>
-        <p>Choose one upgrade to strengthen your Antivirus.</p>
-        <div class="upgrade-grid" id="upgradeGrid"></div>
-      </div>
-    </div>
+                button.secondary {
+                    background: #111827;
+                    color: #e5e7eb;
+                    border: 1px solid rgba(148,163,184,0.7);
+                }
 
-    <!-- Game over overlay -->
-    <div class="overlay" id="gameOverOverlay">
-      <div class="panel">
-        <h2>System Compromised</h2>
-        <p id="gameOverText">You were overwhelmed.</p>
-        <div class="btn-row">
-          <button id="btnRestart">Restart</button>
-          <button class="secondary" id="btnQuit">Back to Title</button>
-        </div>
-      </div>
-    </div>
+                button.danger {
+                    background: #f97373;
+                    color: #111827;
+                }
 
-    <!-- Pause overlay -->
-    <div class="overlay" id="pauseOverlay">
-      <div class="panel">
-        <h2>System Paused</h2>
-        <p>The scan is paused. Take a breather.</p>
-        <div class="btn-row">
-          <button id="btnPauseResume">Resume</button>
-          <button class="secondary" id="btnPauseOptions">Options</button>
-          <button class="secondary" id="btnPauseTitle">Back to Title</button>
-        </div>
-      </div>
-    </div>
+                button:disabled {
+                    opacity: 0.5;
+                    pointer-events: none;
+                }
+            /* Game over overlay */
+            .overlay#gameOverOverlay .panel {
+                text-align: center;
+            }
 
-    <!-- Ransomware bar -->
-    <div class="ransom-bar" id="ransomBar" style="display:none;">
-      <span id="ransomText">Ransomware stole an ability!</span>
-      <button id="btnPayRansom" class="secondary" style="font-size:10px;padding:4px 8px;">Pay 50 Chips</button>
-      <button id="btnIgnoreRansom" class="secondary" style="font-size:10px;padding:4px 8px;">Ignore</button>
-    </div>
-  </div>
-</div>
-  <!-- Touch joystick overlay (for mobile controls) -->
-<div id="touchJoystickBase">
-  <div id="touchJoystickStick"></div>
-</div>
+            .overlay#gameOverOverlay h2 {
+                color: var(--danger);
+            }
+            /* Upgrade grid */
+            .upgrade-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill,minmax(180px,1fr));
+                gap: 12px;
+                margin-top: 8px;
+            }
 
+            .upgrade-card {
+                padding: 12px 12px 8px;
+                border-radius: 8px;
+                border: 1px solid rgba(148,163,184,0.5);
+                background: #111827;
+                cursor: pointer;
+            }
 
-<!-- Debug first so it can see everything -->
-<script src="AntivirusDefend/debug/debug.js?v=0.0.1"></script>
+                .upgrade-card:hover {
+                    border-color: #38bdf8;
+                    background: #1e293b;
+                }
 
-<!-- Data / logic modules FIRST -->
-  <script src="AntivirusDefend/textures/textures.js?v=0.0.2"></script>
-<script src="AntivirusDefend/heroes/heroes.js?v=0.4.4"></script>
-<script src="AntivirusDefend/enemies/enemies.js?v=0.4.4"></script>
-<script src="AntivirusDefend/stages/stages.js?v=0.4.7"></script>
-<script src="AntivirusDefend/upgrades/upgrades.js?v=0.4.4"></script>
-<script src="AntivirusDefend/engine/input.js?v=0.1.5"></script>
+                .upgrade-card.selected {
+                    border-color: #38bdf8;
+                    background: #1e293b;
+                }
 
-<!-- The game engine (uses AVDEF.* from above) -->
-<script src="AntivirusDefend/engine/plugins/loader/pluginloader.js?v=0.1.0"></script>
-<script src="AntivirusDefend/engine/engine.js?v=0.4.9-Inf4"></script>
-<script src="AntivirusDefend/engine/plugins/gamemodes/freeplay.js?v=0.1.0"></script>
+            .upgrade-name {
+                font-weight: 600;
+                font-size: 14px;
+            }
 
-<!-- (Optional for later) title.js – but keep it “dumb” for now -->
-<script src="AntivirusDefend/ui/renderengine.js?v=0.4.13"></script>
-</body>
+            .upgrade-desc {
+                font-size: 12px;
+                color: #94a3b8;
+                margin-top: 4px;
+            }
+            /* Pause overlay */
+            .overlay#pauseOverlay .panel {
+                text-align: center;
+            }
+            /* Ransom bar */
+            .ransom-bar {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                padding: 8px 12px;
+                background: rgba(249,115,115,0.9);
+                border-bottom: 1px solid #ef4444;
+                color: #111827;
+                font-size: 12px;
+                font-weight: 600;
+                text-align: center;
+                z-index: 20;
+            }
+
+                .ransom-bar button {
+                    margin-left: 8px;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                }
+
+                    .ransom-bar button.secondary {
+                        background: #111827;
+                        color: #e5e7eb;
+                    }
+        </style>
+    </head>
+    <body>
+        <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+        <script src="AntivirusDefend/debug/debug.js?v=0.0.1"></script>
+
+        <script src="AntivirusDefend/textures/textures.js?v=0.0.2"></script>
+        <script src="AntivirusDefend/heroes/heroes.js?v=0.4.4"></script>
+        <script src="AntivirusDefend/enemies/enemies.js?v=0.4.4"></script>
+        <script src="AntivirusDefend/stages/stages.js?v=0.4.7"></script>
+        <script src="AntivirusDefend/upgrades/upgrades.js?v=0.4.4"></script>
+        <script src="AntivirusDefend/engine/input.js?v=0.1.5"></script>
+
+        <script src="AntivirusDefend/engine/plugins/loader/pluginloader.js?v=0.1.0"></script>
+        <script src="AntivirusDefend/engine/projectManager.js?v=0.1.0"></script>
+
+                <script src="AntivirusDefend/engine/engine.js?v=0.4.9-Inf4"></script>
+
+        <script src="AntivirusDefend/ui/menu.js?v=0.4.13"></script>
+        <script src="AntivirusDefend/ui/editor.js?v=0.1.0"></script>
+        <script src="AntivirusDefend/ui/renderengine.js?v=0.4.13"></script>
+
+    </body>
 </html>
+</DOCUMENT>

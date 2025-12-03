@@ -1,0 +1,15 @@
+{
+  "id": "freeplay",
+  "name": "Freeplay",
+  "description": "Endless survival mode with ramsticks, waves, and upgrades.",
+  "engineVersion": "A.0.4.8",
+  "modeType": "freeplay_core",
+  "ui": {
+    "theme": {
+      "accent": "#38bdf8",
+      "panel": "#020617"
+    }
+  },
+  "script": "AntivirusDefend/engine/plugins/gamemodes/Builtin/JS Scripts/freeplay_core.js",
+  "canvasLayout": "Windows"
+}

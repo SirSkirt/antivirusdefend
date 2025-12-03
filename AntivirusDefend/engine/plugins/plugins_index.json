@@ -1,0 +1,6 @@
+{
+  "gamemodes": [
+    "AntivirusDefend/engine/plugins/gamemodes/Builtin/freeplay.gmemde",
+    "AntivirusDefend/engine/plugins/gamemodes/Builtin/towerdef.gmemde"
+  ]
+}

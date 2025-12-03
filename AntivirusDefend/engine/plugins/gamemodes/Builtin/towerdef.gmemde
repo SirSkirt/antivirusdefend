@@ -1,0 +1,9 @@
+{
+  "id": "towerdef",
+  "title": "Tower Defense",
+  "description": "Prototype tower defense mode (stub).",
+  "kind": "minigame",
+  "modeId": "towerdef",
+  "script": "AntivirusDefend/engine/plugins/gamemodes/Builtin/JS Scripts/towerdef_core.js",
+  "canvasLayout": "full"
+}
